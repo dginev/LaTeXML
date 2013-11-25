@@ -43,8 +43,9 @@ $IDENTITY = "$FindBin::Script ($FULLVERSION)";
 sub new {
   my ($class, %options) = @_;
   my $state = LaTeXML::State->new(catcodes => 'standard',
-    stomach => LaTeXML::Stomach->new(),
-    model => $options{model} || LaTeXML::Model->new());
+    stomach    => LaTeXML::Stomach->new(),
+    mathparser => LaTeXML::MathParser->new(),
+    model      => $options{model} || LaTeXML::Model->new());
   $state->assignValue(VERBOSITY => (defined $options{verbosity} ? $options{verbosity} : 0),
     'global');
   $state->assignValue(STRICT => (defined $options{strict} ? $options{strict} : 0),
@@ -61,7 +62,7 @@ sub new {
   $state->assignValue(INCLUDE_STYLES => $options{includeStyles} || 0, 'global');
   $state->assignValue(PERL_INPUT_ENCODING => $options{inputencoding}) if $options{inputencoding};
   return bless { state => $state,
-    nomathparse => $options{nomathparse} || 0,
+    mathparse => ((defined $options{mathparse}) ? $options{mathparse} : 'RecDescent'),
     preload => $options{preload},
     }, $class; }
 
@@ -87,7 +88,7 @@ sub getStatusMessage {
 
 sub getStatusCode {
   my ($self) = @_;
-  return $$self{state}->getStatusCode; }
+  $$self{state}->getStatusCode; }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Mid-level API.
@@ -179,13 +180,15 @@ sub convertDocument {
   my ($self, $digested) = @_;
   return
     $self->withState(sub {
-      my ($state)  = @_;
-      my $model    = $state->getModel;                 # The document model.
-      my $document = LaTeXML::Document->new($model);
+      my ($state)     = @_;
+      my $model       = $state->getModel;                 # The document model.
+      my $math_parser = $state->getMathParser;
+      my $document    = LaTeXML::Document->new($model);
       local $LaTeXML::DOCUMENT = $document;
       NoteBegin("Building");
-      $model->loadSchema();                            # If needed?
+      $model->loadSchema();                               # If needed?
       if (my $paths = $state->lookupValue('SEARCHPATHS')) {
+
         if ($state->lookupValue('INCLUDE_COMMENTS')) {
           $document->insertPI('latexml', searchpaths => join(',', @$paths)); } }
       foreach my $preload (@{ $$self{preload} }) {
@@ -205,7 +208,7 @@ sub convertDocument {
           $rule->rewrite($document, $document->getDocument->documentElement); }
         NoteEnd("Rewriting"); }
 
-      LaTeXML::MathParser->new()->parseMath($document) unless $$self{nomathparse};
+      $math_parser->parseMath($document, parser => $self->{mathparse}) if ($self->{mathparse} && ($self->{mathparse} ne 'no'));
       NoteBegin("Finalizing");
       my $xmldoc = $document->finalize();
       NoteEnd("Finalizing");

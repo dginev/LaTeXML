@@ -1155,12 +1155,21 @@ sub cmml_internal {
   if ($tag eq 'ltx:XMDual') {
     my ($content, $presentation) = element_nodes($node);
     return cmml($content); }
-  elsif (($tag eq 'ltx:XMWrap') || ($tag eq 'ltx:XMArg')) {    # Only present if parsing failed!
-    return cmml_contents($node); }
+  elsif (($tag eq 'ltx:XMWrap') || ($tag eq 'ltx:XMArg')) {
+    # Usually only present if parsing failed
+    # but there is a special bound variable case...
+    my $role = $node->getAttribute('role') || '';
+    if ($role eq 'BVAR') {
+      return ['m:bvar', {}, map { cmml($_) } element_nodes($node)]; }
+    else {
+      return cmml_contents($node); } }
   elsif ($tag eq 'ltx:XMApp') {
+    my $role = $node->getAttribute('role') || '';
     # Experiment: If XMApp has role ID, we treat it as a "Decorated Symbol"
-    if (($node->getAttribute('role') || '') eq 'ID') {
+    if ($role eq 'ID') {
       return cmml_decoratedSymbol($node); }
+    elsif ($role eq 'BIND') {
+      return ['m:bind', {}, map { cmml($_) } element_nodes($node)] }
     else {
       my ($op, @args) = element_nodes($node);
       if (!$op) {

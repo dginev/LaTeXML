@@ -273,8 +273,9 @@ ExpressionsNoBars : Expressions
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 Factor  : 
+        anyArg
         # These 2nd two are Iffy; hopefully the 1st rule will protect from backtrack?
-          OPEN ARRAY CLOSE  addScripts[Fence($item[1],$item[2],$item[3])]
+        |  OPEN ARRAY CLOSE  addScripts[Fence($item[1],$item[2],$item[3])]
           # perhaps only when OPEN or CLOSED is { or } ??
         # should be explicitly {, and moreover the array should be only 1 or 2 columns!
         | LBRACE ARRAY { InterpretDelimited(New('cases'),$item[1],$item[2],Absent()); }
@@ -420,7 +421,13 @@ addScripts :
         | POSTSUPERSCRIPT  addScripts[NewScript($arg[0],$item[1])]
         | POSTSUBSCRIPT    addScripts[NewScript($arg[0],$item[1])]
         | POSTFIX          addScripts[Apply($item[1],$arg[0])]
-        | { $arg[0]; }
+        | { $arg[0];}
+
+anyArg :
+          /XMApp:start:\d+/ anyArg /XMApp:end:\d+/ {$item[2]}
+        | /XMArg:start:\d+/ Expression /XMArg:end:\d+/ {$item[2]}
+        | /XMWrap:start:\d+/ Expression /XMWrap:end:\d+/ {$item[2]}
+        | FRACOP anyArg anyArg { ApplyNary($item[1],$item[2],$item[3]) }
 
 # ================================================================================
 # preScripted['RULE']; match a RULE possibly preceded by sub/super prescripts,
@@ -760,6 +767,7 @@ MODIFIER        : /MODIFIER:\S*:\d+/            { Lookup($item[1]); }
 ARROW           : /ARROW:\S*:\d+/               { Lookup($item[1]); }
 ADDOP           : /ADDOP:\S*:\d+/               { Lookup($item[1]); }
 MULOP           : /MULOP:\S*:\d+/               { Lookup($item[1]); }
+FRACOP          : /FRACOP:\S*:\d+/              { Lookup($item[1]); }
 BINOP           : /BINOP:\S*:\d+/               { Lookup($item[1]); }
 POSTFIX         : /POSTFIX:\S*:\d+/             { Lookup($item[1]); }
 FUNCTION        : /FUNCTION:\S*:\d+/            { Lookup($item[1]); }

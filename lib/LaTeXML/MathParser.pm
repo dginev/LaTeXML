@@ -124,7 +124,9 @@ sub cleanupScripts {
 
 sub getQName {
   my ($node) = @_;
-  if (ref $node eq 'ARRAY') {
+  if (!ref $node) {
+    return $node; }
+  elsif (ref $node eq 'ARRAY') {
     return $$node[0]; }
   else {
     return $LaTeXML::MathParser::DOCUMENT->getModel->getNodeQName($node); } }
@@ -192,7 +194,7 @@ sub printNode {
     my ($tag, $attr, @children) = @$node;
     my @keys = sort keys %$attr;
     return "<$tag"
-      . (@keys ? ' ' . join(' ', map { "$_='$$attr{$_}'" } @keys) : '')
+      . (@keys ? ' ' . join(' ', map { $_ . "='" . ($$attr{$_} || '') . "'" } @keys) : '')
       . (@children
       ? ">\n" . join('', map { printNode($_) } @children) . "</$tag>"
       : '/>')
@@ -298,10 +300,9 @@ sub parse {
 
 my %TAG_FEEDBACK = ('ltx:XMArg' => 'a', 'ltx:XMWrap' => 'w');    # [CONSTANT]
 # Recursively parse a node with some internal structure
-# by first parsing any structured children, then it's content.
+# by first parsing any structured children, then its content.
 sub parse_rec {
   my ($self, $node, $rule, $document) = @_;
-  $self->parse_children($node, $document);
 
   # This will only handle 1 layer nesting (successfully?)
   # Note that this would have been found by the top level xpath,
@@ -369,42 +370,6 @@ sub parse_rec {
     $$self{failed}{$tag}++;
     return; } }
 
-# Depth first parsing of XMArg nodes.
-sub parse_children {
-  my ($self, $node, $document) = @_;
-  foreach my $child (element_nodes($node)) {
-    my $tag = getQName($child);
-    if ($tag eq 'ltx:XMArg') {
-      $self->parse_rec($child, 'Anything', $document); }
-    elsif ($tag eq 'ltx:XMWrap') {
-      local $LaTeXML::MathParser::STRICT = 0;
-      $self->parse_rec($child, 'Anything', $document); }
-### A nice evolution would be to use the Kludge parser for
-### the presentation form in XMDual
-### This would avoid silly "parses" of non-semantic stuff; eg assuming times between tokens!
-### However, it needs some experimentation to match DLMF's enhancements
-####      $self->parse_children($child,$document);
-####      $self->parse_kludge($child,$document); }
-    elsif ($tag =~ /^ltx:(XMApp|XMArray|XMRow|XMCell)$/) {
-      $self->parse_children($child, $document); }
-    elsif ($tag eq 'ltx:XMDual') {
-      $self->parse_children($child, $document); }
-    ### Some day this may be needed? but not yet...
-   #     elsif ($tag eq 'ltx:XMRef') {
-   #       # We might be referencing something outside the current tree.
-   #       # but we'd like it's contents to be parsed before we start using it at this level.
-   #       # NOTE: Do we have to worry about things being parsed twice? (ie. when the other tree's done)
-   #       # if so, we probably want to mark things as having already been parsed.
-   #       my $refnode = realizeXMNode($child);
-   #       if(getQName($refnode) ne 'ltx:XMTok'){ # Anything referenced with structure...
-   #         print STDERR "PRE-PARSING Ref'd node: ".ToString($child)." == ".ToString($refnode). "\n";
-   # ##        $self->parse_rec($refnode,'Anything',$document);
-   #         $self->parse_children($refnode,$document);
-   #         print STDERR "NOW REFERENCES: ".ToString(realizeXMNode($child))."\n";
-   #  } }
-  }
-  return; }
-
 my $HINT_PUNCT_THRESHOLD = 10.0;    # \quad or bigger becomes punctuation ? [CONSTANT]
 
 sub filter_hints {
@@ -416,6 +381,9 @@ sub filter_hints {
   my $pending_phantom  = undef;
   # Filter the nodes, watching for XMHint's and Comments.
   foreach my $node (@nodes) {
+    if (!ref $node) {
+      push @prefiltered, $node;
+      continue; }
     my $type = $node->nodeType;
     if ($type == XML_TEXT_NODE) {    # text? better be (ignorable) whitespace!
       my $string = $node->textContent;
@@ -463,6 +431,7 @@ sub filter_hints {
         $pending_phantom = undef; }
       push(@prefiltered, $node); $prev = $node; }    # Keep it.
   }
+
   # if $pending_space > 0, should store as rpadding on last element?
   my @filtered = ();
   # Filter through the pre-filtered nodes looking for large rpadding to convert to virtual PUNCT.
@@ -641,7 +610,7 @@ sub parse_kludgeScripts_rec {
 # Convert to textual form for processing by MathGrammar
 sub parse_single {
   my ($self, $mathnode, $document, $rule) = @_;
-  my @nodes = $self->filter_hints($document, $mathnode->childNodes);
+  my @nodes = $self->unpack_children($document, $mathnode->childNodes);
 
   my ($punct, $result, $unparsed);
   my @punct = ();
@@ -786,15 +755,19 @@ sub parse_internal {
   foreach my $node (@nodes) {
     # This is a parser-specific lexeme, but it is not (yet) identical to the serialized lexeme by
     # ->node_to_lexeme, which is currently experimental
-    my $role = $self->getGrammaticalRole($node);
-    my $text = getTokenMeaning($node);
-    $text = 'Unknown' unless defined $text;
-    my $lexeme = $role . ":" . $text . ":" . ++$i;
+    my $lexeme;
+    if (ref $node) {
+      my $role = $self->getGrammaticalRole($node);
+      my $text = getTokenMeaning($node);
+      $text = 'Unknown' unless defined $text;
+      $lexeme = $role . ":" . $text . ":" . ++$i; }
+    else {
+      $lexeme = $node . ":" . ++$i; }
     $lexeme =~ s/\s//g;
-
     $$LaTeXML::MathParser::LEXEMES{$lexeme} = $node;
     $lexemes .= ' ' . $lexeme; }
 
+  print STDERR "\n\n LEXEMES: $lexemes \n\n";
   #------------
   # apply the parser to the textified sequence.
   local $LaTeXML::MathParser::PARSER               = $self;
@@ -828,6 +801,23 @@ sub parse_internal {
   # If still failed, try other strategies?
 
   return ($result, $unparsed); }
+
+sub unpack_children {
+  my ($self, $document, @nodes) = @_;
+  @nodes = $self->filter_hints($document, @nodes);
+  my @unpacked = ();
+  foreach my $node (@nodes) {
+    my $name = getQName($node);
+    if ($name eq 'ltx:XMArg' || $name eq 'ltx:XMWrap' || $name eq 'ltx:XMApp') {
+      $name =~ s/^ltx\://;
+      push @unpacked, ("$name:start", $self->unpack_children($document, $node->childNodes), "$name:end");
+    } else {
+      push @unpacked, $node;
+    }
+  }
+
+  return @unpacked;
+}
 
 sub getGrammaticalRole {
   my ($self, $node) = @_;
@@ -889,6 +879,8 @@ sub failureReport {
 # used for debugging & failure reporting.
 sub node_string {
   my ($node, $document) = @_;
+  if (!ref $node) {
+    return $node; }
   my $role = $node->getAttribute('role') || 'UNKNOWN';
   my $box  = $document->getNodeBox($node);
   return ($box ? ToString($box) : text_form($node)) . "[[$role]]"; }
@@ -1732,15 +1724,15 @@ sub specialize_integrand {
       else {
         # are we in a fraction? differentials get substituted with "1" if so
         return ([$bvar_ref], ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1]); } }
-    # II. (d x ARG) case
-    elsif (($op_role eq 'MULOP') && (scalar(@children) == 2) &&
-      ((p_getAttribute($children[0], 'role') || '') eq 'UNKNOWN') && (p_getValue($children[0]) eq 'd')) {
-      my ($bvar_ref) = XMRefs($children[1]);
-      if (!$in_fraction) {
-        return ([$bvar_ref], undef); }
-      else {
-        # are we in a fraction? differentials get substituted with "1" if so
-        return ([$bvar_ref], ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1]); } }
+ # # II. (d x ARG) case
+ # elsif (($op_role eq 'MULOP') && (scalar(@children) == 2) &&
+ #   ((p_getAttribute($children[0], 'role') || '') eq 'UNKNOWN') && (p_getValue($children[0]) eq 'd')) {
+ #   my ($bvar_ref) = XMRefs($children[1]);
+ #   if (!$in_fraction) {
+ #     return ([$bvar_ref], undef); }
+ #   else {
+ #     # are we in a fraction? differentials get substituted with "1" if so
+ #     return ([$bvar_ref], ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1]); } }
     else {
       # intermediate node, descend into arguments
       # fresh start, no bvars found yet on this level

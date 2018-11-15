@@ -1115,6 +1115,9 @@ sub CatSymbols {
 sub Absent {
   return New('absent'); }
 
+sub Void {
+  return New('void'); }
+
 sub InvisibleTimes {
   return New('times', "\x{2062}", role => 'MULOP', font => LaTeXML::Common::Font->new()); }
 
@@ -1769,7 +1772,7 @@ sub Integral {
 
 sub DiffD {
   my ($d, $var, $in_fraction) = @_;
-  my $diff_meaning = $in_fraction ? ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1] : Absent();
+  my $diff_meaning = $in_fraction ? ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1] : Void();
   return ['ltx:XMDual', {},
     $diff_meaning,
     Apply(Annotate($d, role => 'DIFFOP', meaning => 'differential-d'), $var)];

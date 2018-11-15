@@ -248,6 +248,9 @@ DefOpenMath('Apply:?:exists', sub {
       ['om:OMBVAR', {}, map { om_expr($_) } @vars],    # Presumably, these yield OMV
       om_expr($body)]; });
 
+# Omitted artefacts
+DefOpenMath("Token:?:void", sub { undef; }, sub { undef; }); # Intended to be dropped, typically prunes an XMDual branch
+
 # ================================================================================
 # Applications.
 

@@ -1305,9 +1305,10 @@ DefMathML("Token:NUMBER:?", \&pmml_mn, sub {
     my $n = $_[0]->textContent;
     return ['m:cn', { type => ($n =~ /^[+-]?\d+$/ ? 'integer' : 'float') }, $n]; });
 DefMathML("Token:?:absent", sub { return ['m:mi', {}] });    # Not m:none!
-        # Hints normally would have disappeared during parsing
-        # (turned into punctuation or padding?)
-        # but if they survive (unparsed?) turn them into space
+DefMathML("Token:?:void", sub { undef; }, sub { undef; }); # Intended to be dropped, typically prunes an XMDual branch
+                                                           # Hints normally would have disappeared during parsing
+                                                           # (turned into punctuation or padding?)
+                                                           # but if they survive (unparsed?) turn them into space
 DefMathML('Hint:?:?', sub {
     my ($node) = @_;
     if (my $w = $node->getAttribute('width')) {
@@ -1315,7 +1316,7 @@ DefMathML('Hint:?:?', sub {
       ['m:mspace', { width => $w }]; }
     else {
       undef } },
-  sub { undef; });    # Should Disappear from cmml!
+  sub { undef; });                                         # Should Disappear from cmml!
 
 # At presentation level, these are essentially adorned tokens.
 # args are (accent,base)

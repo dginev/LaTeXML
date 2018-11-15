@@ -34,7 +34,7 @@ our @EXPORT_OK = (qw(&Lookup &New &Absent &Apply &ApplyNary &recApply &CatSymbol
     &LeftRec
     &Arg &MaybeFunction
     &SawNotation &IsNotationAllowed
-    &isMatchingClose &Fence &Integral));
+    &isMatchingClose &Fence &Integral &DiffD));
 our %EXPORT_TAGS = (constructors
     => [qw(&Lookup &New &Absent &Apply &ApplyNary &recApply &CatSymbols
       &Annotate &InvisibleTimes &InvisibleComma
@@ -43,7 +43,7 @@ our %EXPORT_TAGS = (constructors
       &LeftRec
       &Arg &MaybeFunction
       &SawNotation &IsNotationAllowed
-      &isMatchingClose &Fence &Integral)]);
+      &isMatchingClose &Fence &Integral &DiffD)]);
 
 # ================================================================================
 sub new {
@@ -767,7 +767,6 @@ sub parse_internal {
     $$LaTeXML::MathParser::LEXEMES{$lexeme} = $node;
     $lexemes .= ' ' . $lexeme; }
 
-  print STDERR "\n\n LEXEMES: $lexemes \n\n";
   #------------
   # apply the parser to the textified sequence.
   local $LaTeXML::MathParser::PARSER               = $self;
@@ -1698,75 +1697,6 @@ sub XMRefs {
   my @nodes = @_;
   return LaTeXML::Package::createXMRefs($LaTeXML::MathParser::DOCUMENT, @nodes); }
 
-sub specialize_integrand {
-  my ($integrand, $in_fraction) = @_;
-  my @bvars = ();
-  my $specialized;
-  if ((p_getTokenMeaning($integrand) || '') ne 'integral') {
-    ($specialized) = XMRefs($integrand);
-  }
-
-  if (getQName($integrand) eq 'ltx:XMApp') {
-    my ($op, @children) = p_element_nodes($integrand);
-    my $op_meaning = p_getTokenMeaning($op);
-    my $op_role = p_getAttribute($op, 'role') || '';
-    $in_fraction = $in_fraction || ($op_role eq 'FRACOP');
-
-    my @specialized_children = XMRefs($op);
-
-    # I. Grammar-recognized case
-    if ($op_meaning =~ /^differential/) {    # differential, differential-d
-          # leaf case, looking at a differential binder
-          # If we were to be deleting in the original tree, this is how: @$integrand = ();
-      my ($bvar_ref) = XMRefs($children[0]);
-      if (!$in_fraction) {
-        return ([$bvar_ref], undef); }
-      else {
-        # are we in a fraction? differentials get substituted with "1" if so
-        return ([$bvar_ref], ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1]); } }
- # # II. (d x ARG) case
- # elsif (($op_role eq 'MULOP') && (scalar(@children) == 2) &&
- #   ((p_getAttribute($children[0], 'role') || '') eq 'UNKNOWN') && (p_getValue($children[0]) eq 'd')) {
- #   my ($bvar_ref) = XMRefs($children[1]);
- #   if (!$in_fraction) {
- #     return ([$bvar_ref], undef); }
- #   else {
- #     # are we in a fraction? differentials get substituted with "1" if so
- #     return ([$bvar_ref], ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1]); } }
-    else {
-      # intermediate node, descend into arguments
-      # fresh start, no bvars found yet on this level
-      my $prev_bvar = 0;
-      for my $child (@children) {
-        my ($ibvars, $iexpr) = specialize_integrand($child, $in_fraction);
-        if (defined $iexpr) {
-          # spot elipses in differentials
-          if ($prev_bvar && (p_getTokenMeaning($iexpr) || '') =~ /^[cl]dots$/) {
-            push @bvars, $iexpr;
-          } else {
-            push @specialized_children, $iexpr;
-          }
-        }
-        if (scalar(@$ibvars)) {
-          push @bvars, @$ibvars;
-          $prev_bvar = 1;
-        } else {
-          $prev_bvar = 0;
-        }
-      }
-      if (($op_role eq 'MULOP') && (scalar(@specialized_children) - 1 < scalar(@children))
-        && (scalar(@specialized_children) == 2)) {
-      # We now have a unary operator, due to deleting differentials, so if the operator is a MULOP, drop it.
-        shift @specialized_children;
-      }
-      if (scalar(@specialized_children) > 1) {
-        $specialized = ['ltx:XMApp', {}, @specialized_children];
-      } else {
-        $specialized = $specialized_children[0];
-      }
-  } }
-  return (\@bvars, $specialized); }
-
 # TODO: Should we just regex on /-integral$/ ?
 our %known_integral_meanings = (
   'contour-integral'                  => 1,
@@ -1816,34 +1746,34 @@ sub specialize_range {
   }
   return ($range, $int_csymbol); }
 
-sub specialize_integral {
-  my ($operator, $complete_integral) = @_;
-  # Extract the integrand from $complete_integral
-  my ($bvars, $integrand);
+sub Integral {
+  my ($operator, $complete_integral, $bvars) = @_;
+  my @bvar_refs = map { XMRefs($_) } @$bvars;
+
+  my $integrand;
   if (getQName($complete_integral) eq 'ltx:XMApp') {
     my @children = p_element_nodes($complete_integral);
-    $integrand = $children[1];
-    # I. Scan integrand for bound variables
-    ($bvars, $integrand) = specialize_integrand($integrand);
-    # print STDERR "BVARS: ", Dumper($bvars),"\n\n";
-    # print STDERR "Integrand: ", Dumper($integrand), "\n\n";
-  }
-
-  # II. Scan operator for range
+    ($integrand) = XMRefs($children[1]); }
+  else {
+    ($integrand) = XMRefs($complete_integral); }
+  # I. Scan operator for range
   my ($from, $to, $base) = bigop_parts($operator);
-  # III. Specialize integral symbol and range
+  # II. Specialize integral symbol and range
   my ($range, $int_csymbol) = specialize_range($from, $to, $base);
   # III. Reconstruct strict tree
-  return Apply($int_csymbol,
-    ($range ? $range : ()),
-    Bind($bvars, $integrand)); }
-
-sub Integral {
-  my ($operator, $complete_integral_presentation) = @_;
-  my $content_tree = specialize_integral($operator, $complete_integral_presentation);
   return ['ltx:XMDual', {},
-    $content_tree,
-    $complete_integral_presentation]; }
+    Apply($int_csymbol,
+      ($range ? $range : ()),
+      Bind(\@bvar_refs, $integrand)),
+    $complete_integral]; }
+
+sub DiffD {
+  my ($d, $var, $in_fraction) = @_;
+  my $diff_meaning = $in_fraction ? ['ltx:XMTok', { meaning => 1, role => "NUMBER" }, 1] : Absent();
+  return ['ltx:XMDual', {},
+    $diff_meaning,
+    Apply(Annotate($d, role => 'DIFFOP', meaning => 'differential-d'), $var)];
+}
 
 # ================================================================================
 1;

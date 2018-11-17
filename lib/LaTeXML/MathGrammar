@@ -77,8 +77,8 @@ AnythingAny :
         | METARELOP Formula               { Apply($item[1],Absent(),$item[2]); }
         | AnyOp (PUNCT(?) AnyOp {[$item[1]->[0]||InvisibleComma(), $item[2]]})(s)
                                           { NewList($item[1],map(@$_,@{$item[2]})); }
-        | FLOATSUPERSCRIPT POSTSUBSCRIPT  { NewScript(NewScript(Absent(),$item[1]),$item[2]); }
-        | FLOATSUBSCRIPT POSTSUPERSCRIPT  { NewScript(NewScript(Absent(),$item[1]),$item[2]); }
+        | FLOATSUPERSCRIPT postsubscript  { NewScript(NewScript(Absent(),$item[1]),$item[2]); }
+        | FLOATSUBSCRIPT postsuperscript  { NewScript(NewScript(Absent(),$item[1]),$item[2]); }
         | FLOATSUPERSCRIPT                { NewScript(Absent(),$item[1]); }
         | FLOATSUBSCRIPT                  { NewScript(Absent(),$item[1]); }
         | AnyOp Expression                { Apply($item[1],Absent(),$item[2]);}
@@ -274,9 +274,8 @@ ExpressionsNoBars : Expressions
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 Factor  : 
-        anyArg
         # These 2nd two are Iffy; hopefully the 1st rule will protect from backtrack?
-        |  OPEN ARRAY CLOSE  addScripts[Fence($item[1],$item[2],$item[3])]
+        OPEN ARRAY CLOSE  addScripts[Fence($item[1],$item[2],$item[3])]
           # perhaps only when OPEN or CLOSED is { or } ??
         # should be explicitly {, and moreover the array should be only 1 or 2 columns!
         | LBRACE ARRAY { InterpretDelimited(New('cases'),$item[1],$item[2],Absent()); }
@@ -315,8 +314,11 @@ Factor  :
         | OPERATOR addScripts[$item[1]] nestOperators[$item[2]]
                     addOpFunArgs[$item[3]]
 
-ATOM_OR_ID : ATOM | ID | ARRAY
+ATOM_OR_ID : atom | ID | ARRAY
 
+atom:   ATOM 
+        # TODO: Figure out what to do with the XMApp wrappers... what other cases are there?
+        | /OPEN:XMApp:\d+/ FRACOP markedArg['Expression'] markedArg['Expression'] /CLOSE:XMApp:\d+/ { ApplyNary($item[2],$item[3],$item[4]) }
 
 # A restricted sort of Factor for the unparenthesized argument to a function.
 # Note f g h => f*g*h, but f g h x => f(g(h(x)))  Seems like what people mean...
@@ -359,12 +361,12 @@ moreTrigBareargs :
 
 # maybeEvalAt[$thing,$vertbar]
 maybeEvalAt :
-          POSTSUBSCRIPT moreEvalAt[$arg[0],$arg[1],$item[1]]
-        | POSTSUPERSCRIPT POSTSUBSCRIPT moreFactors[NewEvalAt($arg[0],$arg[1],$item[2],$item[1])]
+          postsubscript moreEvalAt[$arg[0],$arg[1],$item[1]]
+        | postsuperscript postsubscript moreFactors[NewEvalAt($arg[0],$arg[1],$item[2],$item[1])]
 
 # moreEvalAt[$thing,$vertbar,$sub]
 moreEvalAt :
-          POSTSUPERSCRIPT moreFactors[NewEvalAt($arg[0],$arg[1],$arg[2],$item[1])]
+          postsuperscript moreFactors[NewEvalAt($arg[0],$arg[1],$arg[2],$item[1])]
          | moreFactors[NewEvalAt($arg[0],$arg[1],$arg[2],undef)]
 
 #======================================================================
@@ -416,20 +418,22 @@ absExpression : { ($MaxAbsDepth >= 0 ? 1 : (SawNotation('AbsFail')&& undef)); } 
 # Adding pre|post sub|super scripts to various things.
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+postsubscript:   POSTSUBSCRIPT markedArg['Subscript'] /CLOSE:POSTSUBSCRIPT:\d+/         { TransferScript($item[1],$item[2]); }
+postsuperscript: POSTSUPERSCRIPT markedArg['Superscript'] /CLOSE:POSTSUPERSCRIPT:\d+/   { TransferScript($item[1],$item[2]); }
+
 # addScripts[$base] ; adds any following sub/super scripts to $base.
 addScripts :
           /^\Z/ { $arg[0];}   # short circuit!
-        | POSTSUPERSCRIPT  addScripts[NewScript($arg[0],$item[1])]
-        | POSTSUBSCRIPT    addScripts[NewScript($arg[0],$item[1])]
-        | POSTFIX          addScripts[Apply($item[1],$arg[0])]
+        | postsubscript    addScripts[NewScript($arg[0],$item[1])]
+        | postsuperscript  addScripts[NewScript($arg[0],$item[1])]
+        | POSTFIX         addScripts[Apply($item[1],$arg[0])]
         | { $arg[0];}
 
-anyArg :
+markedArg :
         <rulevar: local $in_arg = 1>
-        | /XMApp:start:\d+/ anyArg /XMApp:end:\d+/ {$item[2]}
-        | /XMArg:start:\d+/ Expression /XMArg:end:\d+/ {$item[2]}
-        | /XMWrap:start:\d+/ Expression /XMWrap:end:\d+/ {$item[2]}
-        | FRACOP anyArg anyArg { ApplyNary($item[1],$item[2],$item[3]) }
+        | /^\Z/ { $arg[0];}   # short circuit!
+        | /OPEN:XMArg:\d+/ <matchrule:$arg[0]> /CLOSE:XMArg:\d+/ {$item[2]}
+        | /CLOSE:XMWrap:\d+/ <matchrule:$arg[0]> /CLOSE:XMWrap:\d+/ {$item[2]}
 
 # ================================================================================
 # preScripted['RULE']; match a RULE possibly preceded by sub/super prescripts,
@@ -441,8 +445,8 @@ preScripted :
         | <matchrule:$arg[0]> addScripts[$item[1]]
 # inpreScripted[$prescript]
 inpreScripted :
-          POSTSUPERSCRIPT inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
-        | POSTSUBSCRIPT   inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
+          postsuperscript inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
+        | postsubscript   inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
         | FLOATSUPERSCRIPT inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
         | FLOATSUBSCRIPT   inpreScripted[$arg[0]] { NewScript($item[2],$item[1], 'pre');}
         | <matchrule:$arg[0]> addScripts[$item[1]]
@@ -629,7 +633,6 @@ termIntegral : <rulevar: local $domain = 'calculus'>
         | <rulevar: local $bvars = [] >
         | preScripted['INTOP'] addOpArgs[$item[1]] {Integral($item[1], $item[2], $bvars);}
 
-
 integrandFactor :
         diffd ATOM_OR_ID addScripts[$item[2]] 
           {push @$bvars, $item[3];} { DiffD($item[1], $item[3], $in_arg); }
@@ -682,9 +685,9 @@ MulOp : BINOP addOpDecoration[$item[1]]
 #   Same thing as addScripts, but not allowing POSTFIX
 addOpDecoration :
           /^\Z/ { $arg[0];}   # short circuit!
-        | POSTSUPERSCRIPT  addOpDecoration[DecorateOperator($arg[0],$item[1])]
-        | POSTSUBSCRIPT    addOpDecoration[DecorateOperator($arg[0],$item[1])]
-        | { $arg[0]; }
+        | postsuperscript addOpDecoration[DecorateOperator($arg[0],$item[1])]
+        | postsubscript   addOpDecoration[DecorateOperator($arg[0],$item[1])]
+        | { $arg[0];}
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Pseudo-Terminals. 

@@ -30,7 +30,7 @@ use base (qw(Exporter));
 our @EXPORT_OK = (qw(&Lookup &New &Absent &Apply &ApplyNary &recApply &CatSymbols
     &Annotate &InvisibleTimes &InvisibleComma
     &NewFormulae &NewFormula &NewList
-    &ApplyDelimited &NewScript &DecorateOperator &InterpretDelimited &NewEvalAt
+    &ApplyDelimited &NewScript &TransferScript &DecorateOperator &InterpretDelimited &NewEvalAt
     &LeftRec
     &Arg &MaybeFunction
     &SawNotation &IsNotationAllowed
@@ -39,7 +39,7 @@ our %EXPORT_TAGS = (constructors
     => [qw(&Lookup &New &Absent &Apply &ApplyNary &recApply &CatSymbols
       &Annotate &InvisibleTimes &InvisibleComma
       &NewFormulae &NewFormula &NewList
-      &ApplyDelimited &NewScript &DecorateOperator &InterpretDelimited &NewEvalAt
+      &ApplyDelimited &NewScript &TransferScript &DecorateOperator &InterpretDelimited &NewEvalAt
       &LeftRec
       &Arg &MaybeFunction
       &SawNotation &IsNotationAllowed
@@ -809,14 +809,13 @@ sub unpack_children {
     my $name = getQName($node);
     if ($name eq 'ltx:XMArg' || $name eq 'ltx:XMWrap' || $name eq 'ltx:XMApp') {
       $name =~ s/^ltx\://;
-      push @unpacked, ("$name:start", $self->unpack_children($document, $node->childNodes), "$name:end");
+      my $role = $node->getAttribute('role');
+      push @unpacked, ($role ? $node : "OPEN:$name");
+      push @unpacked, $self->unpack_children($document, $node->childNodes);
+      push @unpacked, ($role ? "CLOSE:$role" : "CLOSE:$name");
     } else {
-      push @unpacked, $node;
-    }
-  }
-
-  return @unpacked;
-}
+      push @unpacked, $node; } }
+  return @unpacked; }
 
 sub getGrammaticalRole {
   my ($self, $node) = @_;
@@ -934,6 +933,8 @@ sub textrec {
     return textrec($content, $outer_bp, $outer_name); }    # Just send out the semantic form.
   elsif ($tag eq 'ltx:XMTok') {
     my $name = getTokenMeaning($node);
+    if ($name eq 'void') {
+      return; }
     $name = 'Unknown' unless defined $name;
     return $PREFIX_ALIAS{$name} || $name; }
   elsif (($tag eq 'ltx:XMWrap') || ($tag eq 'ltx:XMCell')) {
@@ -1537,6 +1538,30 @@ sub ReplacedBy {
   return; }
 
 # ================================================================================
+# Transfers the outer wrapper of a script to the newly parsed script sub-expression
+# mostly preserves NewScript operational as-is, instead of refactoring (hopefully...)
+sub TransferScript {
+  my ($outer, $parsed) = @_;
+  my $font      = p_getAttribute($outer, '_font');
+  my $role      = p_getAttribute($outer, 'role');
+  my $box       = p_getAttribute($outer, '_box');
+  my $scriptpos = p_getAttribute($outer, 'scriptpos');
+  my $cvis      = p_getAttribute($outer, '_cvis');
+  my $pvis      = p_getAttribute($outer, '_pvis');
+  my $lpadding  = p_getAttribute($outer, 'lpadding');
+  my $rpadding  = p_getAttribute($outer, 'rpadding');
+  return ['ltx:XMApp', {
+      ($font      ? (_font     => $font)      : ()),
+      ($role      ? (role      => $role)      : ()),
+      ($box       ? (_box      => $box)       : ()),
+      ($scriptpos ? (scriptpos => $scriptpos) : ()),
+      ($cvis      ? (_cvis     => $cvis)      : ()),
+      ($pvis      ? (_pvis     => $pvis)      : ()),
+      ($lpadding  ? (lpadding  => $lpadding)  : ()),
+      ($rpadding  ? (rpadding  => $rpadding)  : ()),
+  }, $parsed]; }
+
+# ================================================================================
 # Construct an appropriate application of sub/superscripts
 # This accounts for script positioning:
 #   Whether it precedes (float), is over/under (if base requests),
@@ -1752,13 +1777,12 @@ sub specialize_range {
 sub Integral {
   my ($operator, $complete_integral, $bvars) = @_;
   my @bvar_refs = map { XMRefs($_) } @$bvars;
-
   my $integrand;
   if (getQName($complete_integral) eq 'ltx:XMApp') {
     my @children = p_element_nodes($complete_integral);
-    ($integrand) = XMRefs($children[1]); }
+    ($operator, $integrand) = @children; }
   else {
-    ($integrand) = XMRefs($complete_integral); }
+    $integrand = $complete_integral; }
   # I. Scan operator for range
   my ($from, $to, $base) = bigop_parts($operator);
   # II. Specialize integral symbol and range
@@ -1767,7 +1791,7 @@ sub Integral {
   return ['ltx:XMDual', {},
     Apply($int_csymbol,
       ($range ? $range : ()),
-      Bind(\@bvar_refs, $integrand)),
+      Bind(\@bvar_refs, XMRefs($integrand))),
     $complete_integral]; }
 
 sub DiffD {

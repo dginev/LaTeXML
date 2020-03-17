@@ -677,6 +677,10 @@ lib/LaTeXML/Package/xkvview.sty.ltxml
 lib/LaTeXML/Package/xparse.sty.ltxml
 lib/LaTeXML/Package/xspace.sty.ltxml
 lib/LaTeXML/Package/xunicode.sty.ltxml
+lib/LaTeXML/Package/xy.sty.ltxml
+lib/LaTeXML/Package/xy.tex.ltxml
+lib/LaTeXML/Package/xypic.sty.ltxml
+
 lib/LaTeXML/Package/yfonts.sty.ltxml
 
 #==================================================
@@ -1603,3 +1607,9 @@ t/tokenize/verb.xml
 t/tokenize/verbata.pdf
 t/tokenize/verbata.tex
 t/tokenize/verbata.xml
+t/xy/labels.pdf
+t/xy/labels.tex
+t/xy/matrixes.pdf
+t/xy/matrixes.tex
+t/xy/simple.pdf
+t/xy/simple.tex

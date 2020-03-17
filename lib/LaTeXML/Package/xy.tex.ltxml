@@ -1,0 +1,291 @@
+# -*- CPERL -*-
+# /=====================================================================\ #
+# |  xy.tex                                                             | #
+# | Implementation for LaTeXML                                          | #
+# |=====================================================================| #
+# | Part of LaTeXML:                                                    | #
+# |  Public domain software, produced as part of work done by the       | #
+# |  United States Government & not subject to copyright in the US.     | #
+# |---------------------------------------------------------------------| #
+# | Deyan Ginev <dginev@kwarc.info>                             #_#     | #
+# | http://dlmf.nist.gov/LaTeXML/                              (o o)    | #
+# \=========================================================ooo==U==ooo=/ #
+
+package LaTeXML::Package::Pool;
+use strict;
+use warnings;
+use LaTeXML::Package;
+
+# TODO: Reconsider if this is the best we can do about the XY fonts?
+foreach ('dash', 'atip', 'btip', 'bsql', 'circ') {
+  DefPrimitiveI(
+    "\\xy$_" . "font", undef, undef,
+    font   => { family => 'nullfont' },
+    locked => 1
+  );
+}
+
+# Load the raw XYpic definitions
+InputDefinitions('xy', type => 'tex', noltxml => 1);
+
+# Reuse the SVG infrastructure from PGF
+InputDefinitions('pgfsys-latexml', type => 'def', noltxml => 0);
+
+DefConstructor('\xy@svg', sub {
+    my ($document) = @_;
+    # $document->openElement('ltx:picture');
+    $document->openElement('svg:svg');
+    return; },
+  beforeDigest => sub {
+    AssignValue('\X@@min' => 9999,  'global');
+    AssignValue('\Y@@min' => 9999,  'global');
+    AssignValue('\X@@max' => -9999, 'global');
+    AssignValue('\Y@@max' => -9999, 'global');
+    return; });
+
+DefConstructor('\endxy@svg', sub {
+    my ($document, %props) = @_;
+    my $svg = $document->closeElement('svg:svg');
+    # $document->closeElement('ltx:picture');
+    $svg->setAttribute('version', '1.1');
+    $svg->setAttribute('width',   $props{width});
+    $svg->setAttribute('height',  $props{height});
+    $svg->setAttribute('viewBox', $props{viewBox});
+    return; },
+  afterDigest => sub {
+    my ($stomach, $whatsit) = @_;
+
+    # Why are these calculation off? I am manually adjusting but it needs investigating...
+    # TODO: The circle code doesn't seem to add to the mins and maxes accurately!
+    my $minx   = LookupValue('\X@@min') - 10;
+    my $miny   = LookupValue('\Y@@min') - 10;
+    my $maxx   = LookupValue('\X@@max') + 10;
+    my $maxy   = LookupValue('\Y@@max') + 10;
+    my $width  = List::Util::max($maxx - $minx, 1);
+    my $height = List::Util::max($maxy - $miny, 1);
+
+    # Care
+    $whatsit->setProperty(viewBox => ''
+        . $minx . ' '
+        . (-$maxy) . ' '
+        . $width . ' '
+        . $height);
+    $whatsit->setProperty(width  => $width);
+    $whatsit->setProperty(height => $height);
+    $whatsit->setProperty(depth  => Dimension(0));
+    return;
+  });
+
+Let(T_CS('\xy@original'), T_CS('\xy'));
+DefMacro('\xy', '\bgroup\lxSVG@installcommands\xy@svg\xy@original');
+
+Let(T_CS('\endxy@original'), T_CS('\endxy'));
+DefMacro('\endxy', '\endxy@original\endxy@svg\egroup');
+
+# DEPRECATED: We can directly deal with \boxz@ if we use the \lxSVG@installcommands interpretation of the boxing commands
+# Let(T_CS('\objectbox@original'),T_CS('\objectbox'));
+# DefMacro('\objectbox {}', sub{
+#   my ($stomach, $arg) = @_;
+#   UnshiftValue('saved_objectbox',$arg);
+#   return (TokenizeInternal('\objectbox@original'),$arg); });
+
+sub record_XYstate {
+  # TODO: Styling information is stored in \styletoks@
+  my ($stomach, $whatsit) = @_;
+  $whatsit->setProperty(boxz => Digest('\boxz@'));
+  # $whatsit->setProperty(objectbox => Digest(PopValue('saved_objectbox')));
+  $whatsit->setProperty(Lc => LookupDefinition(T_CS('\L@c'))->valueOf);
+  $whatsit->setProperty(Uc => LookupDefinition(T_CS('\U@c'))->valueOf);
+  $whatsit->setProperty(Dc => LookupDefinition(T_CS('\D@c'))->valueOf);
+  $whatsit->setProperty(Rc => LookupDefinition(T_CS('\R@c'))->valueOf);
+  $whatsit->setProperty(
+    Radius => LookupDefinition(T_CS('\R@'))->valueOf);
+  $whatsit->setProperty(Xc => LookupDefinition(T_CS('\X@c'))->valueOf);
+  $whatsit->setProperty(Yc => LookupDefinition(T_CS('\Y@c'))->valueOf);
+  $whatsit->setProperty(Xp => LookupDefinition(T_CS('\X@p'))->valueOf);
+  $whatsit->setProperty(Yp => LookupDefinition(T_CS('\Y@p'))->valueOf);
+  $whatsit->setProperty(dX => LookupDefinition(T_CS('\d@X'))->valueOf);
+  $whatsit->setProperty(dY => LookupDefinition(T_CS('\d@Y'))->valueOf);
+  $whatsit->setProperty(
+    EdgeC => LookupDefinition(T_CS('\Edge@c'))->valueOf);
+  $whatsit->setProperty(Spread =>
+      (LookupDefinition(T_CS('\Spread@@'))->getExpansion->unlist));
+  $whatsit->setProperty(
+    sinDirection => ToString(Expand(T_CS('\sinDirection'))));
+  $whatsit->setProperty(
+    cosDirection => ToString(Expand(T_CS('\cosDirection'))));
+  $whatsit->setProperty(fobj_num => LookupValue('svg_fobjnum') || 0);
+
+  # Save some important metrics:
+  my $Xmin = LookupDefinition(T_CS('\X@min'))->valueOf;
+  my $Ymin = LookupDefinition(T_CS('\Y@min'))->valueOf;
+  my $Xmax = LookupDefinition(T_CS('\X@max'))->valueOf;
+  my $Ymax = LookupDefinition(T_CS('\Y@max'))->valueOf;
+  $Xmin = ref $Xmin && $Xmin->pxValue;
+  $Ymin = ref $Ymin && $Ymin->pxValue;
+  $Xmax = ref $Xmax && $Xmax->pxValue;
+  $Ymax = ref $Ymax && $Ymax->pxValue;
+  AssignValue('\X@@min',
+    List::Util::min(LookupValue('\X@@min'), $Xmin), 'global') if $Xmin;
+  AssignValue('\Y@@min',
+    List::Util::min(LookupValue('\Y@@min'), $Ymin), 'global') if $Ymin;
+  AssignValue('\X@@max',
+    List::Util::max(LookupValue('\X@@max'), $Xmax), 'global') if $Xmax;
+  AssignValue('\Y@@max',
+    List::Util::max(LookupValue('\Y@@max'), $Ymax), 'global') if $Ymax;
+  return; }
+
+DefConstructor('\styledboxz@', sub {
+    my ($document, %props) = @_;
+    my $edge = $props{EdgeC};
+    ($edge) = $edge && $edge->unlist;
+    print STDERR "\nEDGE: ", $edge->getCSName, "\n";
+    print STDERR "BOX:", $props{boxz}->toString, "\n";
+    print STDERR "BOXname:",
+      $props{boxz}->getDefinition->getCS->getCSName, "\n\n";
+
+    if ($edge->getCSName ne '\\rectangleEdge') {
+      # CircleEdge case - just absorb the box, no wrappers
+      $document->absorb($props{boxz});
+      return; }
+    my $saveNode = $document->getNode();
+    $document->floatToElement('svg:g');
+    my $g = $document->openElement(
+      'svg:g',
+      id        => 'fobj' . $props{fobj_num} . 'g',
+      transform => 'translate('
+        . $props{Xc}->add($props{Lc}->negate)->pxValue . ' , '
+        . $props{Yc}->add($props{Dc})->add($props{Uc})
+        ->negate->pxValue . ')'
+    );
+    my $node = $document->getNode;
+
+    #while ($node && !$node->getAttribute('stroke')) { $node = $node->parentNode; }
+    my $sw = $document->openElement('svg:switch');
+    $document->openElement(
+      'svg:foreignObject',
+      # Consult Note 1.4b from xysource
+      # Extra factor of 3 scaling up for foreign objects (???)
+      width  => $props{Rc}->add($props{Lc})->pxValue,
+      height => $props{Uc}->add($props{Dc})->pxValue,
+      class  => 'ltx_foreignobject',
+      id     => 'fobj' . $props{fobj_num},
+      color  => $node->getAttribute('stroke')
+    );
+    my $p = $document->openElement(
+      'ltx:p',
+      xmlns    => 'http://dlmf.nist.gov/LaTeXML',
+      'xml:id' => 'fobj' . $props{fobj_num} . 'c');
+    $document->absorb($props{boxz});
+    $document->maybeCloseElement('ltx:text');
+    $document->closeElement('ltx:p');
+    $document->closeElement('svg:foreignObject');
+    $document->closeElement('svg:switch');
+    $document->closeElement('svg:g');
+    $document->setNode($saveNode);
+
+    # Check the children of the inserted ltx:p
+    # We should at least try to denest svg ?
+    # If svg:switch/svg:foreignObject/ltx:p/ltx:picture/svg:svg/svg:g
+    # should be replaced by just the final svg:g !!! (?)
+
+    my @ch = element_nodes($p);
+    if (scalar(@ch) == 0) {    # Empty <svg:g>s are spurious
+      $document->removeNode($g); }
+    elsif ((scalar(@ch) == 1)
+      && ($document->getNodeQName($ch[0]) eq 'ltx:svg')) {
+      my ($nestedg) = element_nodes($ch[0]);
+      $document->replaceNode($sw, $nestedg); }
+    # Could conceivably be simplifying ltx:text ???
+  },
+  afterDigest  => \&record_XYstate,
+  beforeDigest => sub {
+    addToCount('svg_fobjnum', 1, 'global');
+    return;
+  });
+
+DefMacro('\solid@', '\straight@{\solidSpread@}');
+DefConstructor('\straight@typeset', sub {
+    my ($document, %props) = @_;
+
+    # Spread is in \Spread@@
+    # Connection starts at point (Xc, Yc)
+    # And is determined by the <dX, dY> vector
+    # print STDERR "\n\n\n(Xp,Yp) = (",$props{Xp}->pxValue,",",$props{Yp}->pxValue,")\n";
+    # print STDERR "(Xc,Yc) = (",$props{Xc}->pxValue,",",$props{Yc}->pxValue,")\n";
+    # print STDERR "<dX,dY> = <",$props{dX}->pxValue,",",$props{dY}->pxValue,">\n\n\n";
+    my %stroke_props = (stroke => 'black', fill => "none", 'stroke-width' => 1);
+    my $spread_type  = $props{Spread}->getCSName;
+    print STDERR "\nSpread Type: ", $spread_type, "\n";
+    # Dashed or not?
+    if ($spread_type eq '\dashedSpread@') {
+      $stroke_props{'stroke-dasharray'} = '6 12'; }
+    elsif ($spread_type eq '\dottedSpread@') {
+      $stroke_props{'stroke-dasharray'} = '1 5'; }
+    else {
+      $stroke_props{'stroke-dasharray'} = 'none'; }
+    # Straight or squiggly?
+    if ($spread_type eq '\squiggledSpread@') {
+      addToSVGPath('M', $props{Xp}, $props{Yp}->negate);
+      my $length = sqrt($props{dX}->pxValue * $props{dX}->pxValue + $props{dY}->pxValue * $props{dY}->pxValue);
+      if ($length < 10) {
+        addToSVGPath('L', $props{Xc}, $props{Yc}->negate); }
+      else {
+        # TODO: FixMe , arithmetic is incorrect at the moment
+        my $segments    = $length / 6;
+        my $x_increment = $props{dX}->multiply(1 / $segments);
+        my $y_increment = $props{dY}->multiply(1 / $segments);
+        my $A           = $props{Xp}->add($x_increment);
+        my $B           = $props{Yp}->add($y_increment);
+        addToSVGPath('Q',
+          $props{Xp}->add($x_increment->multiply(0.5)),
+          $props{Yp}->add(Dimension('3pt'))->negate,
+          $A,
+          $B->negate);
+        $A = $A->add($x_increment);
+        $B = $B->add($y_increment);
+        while ((abs($A->add($props{Xp}->negate)->pxValue) < abs($props{Xc}->add($props{Xp}->negate)->pxValue))
+          || (abs($B->add($props{Yp}->negate)->pxValue) < abs($props{Yc}->add($props{Yp}->negate)->pxValue))) {
+          addToSVGPath('T', $A, $B->negate);
+          $A = $A->add($x_increment);
+          $B = $B->add($y_increment); }
+        addToSVGPath('T', $props{Xc}, $props{Yc}->negate);
+    } }
+    else {
+      addToSVGPath('M', $props{Xp}, $props{Yp}->negate);
+      addToSVGPath('L', $props{Xc}, $props{Yc}->negate);
+      addToSVGPath('Z'); }
+    # Construct the path
+    my $svgpath = LookupValue('pgf_SVGpath') || '';
+    $document->insertElement(
+      'svg:path', undef,
+      d => $svgpath,
+      %stroke_props);
+    AssignValue(pgf_SVGpath => '');
+    return; },
+  afterDigest => \&record_XYstate);
+
+DefMacro('\cir@i', '\ltx@cir@i\OBJECT@x');
+DefConstructor('\ltx@cir@i', sub {
+    my ($document, %props) = @_;
+    my $saveNode = $document->getNode();
+    $document->floatToElement('svg:circle');
+    $document->insertElement(
+      'svg:circle', undef,
+      cx     => $props{Xc}->pxValue,
+      cy     => $props{Yc}->negate->pxValue,
+      r      => $props{Radius}->pxValue,
+      stroke => 'black',
+      fill   => "none"
+    );
+    $document->setNode($saveNode);
+  },
+  afterDigest => \&record_XYstate);
+
+1;
+# Super basic example:
+# objectbox: B
+# Edge: \rectangleEdge
+# Xp: 0.0pt Yp: 0.0pt
+#  X: 28.45pt Y: 28.45pt L: 3.75pt R: 3.75pt U: 4.5pt D: 4.5pt
+# \hbox{\kern24.7pt\raise28.45pt\hbox{\hbox{\kern0.0pt\raise-2.5pt\hbox{$\textstyle{B}$}}}}

@@ -101,127 +101,105 @@ our $A11Y_ARG_MARK       = '$';
 
 sub addAccessibilityAnnotations {
   my ($self, $node, $sourcenode, $currentnode) = @_;
-  # 1. Filter and bookkeep which nodes are to be treated.
-  my $current_node_name = getQName($currentnode);
-  return if $current_node_name eq 'ltx:XMath';
-  return if $currentnode->getAttribute('_a11y');
-  $currentnode->setAttribute('_a11y', 'done');
-  my $source_node_name    = getQName($sourcenode);
-  my $current_parent      = $currentnode->parentNode;
-  my $current_parent_name = getQName($current_parent);
-  my $container;
-# In the end it is most sane to explicitly call this function on an XMDual root, when we are in its top presentation node
-  if ($source_node_name eq 'ltx:XMDual' and $current_parent_name eq 'ltx:XMDual' and $current_node_name ne 'ltx:XMDual') {
-    return $self->addAccessibilityAnnotations($node, $sourcenode, $sourcenode); }
-# skip non-material dual presentation, which points to content nodes but should *not* carry annotations itself
-  if ($container = $LaTeXML::Post::DOCUMENT->findnode('ancestor::ltx:XMDual[1]', $currentnode)) {
-# also skip any embellishments in duals that are not semantic, a bit tricky since we need to check parent xmapps
-    my $content_node = $container->firstChild;
-    my %xmrefs       = map { my $ref = $_->getAttribute('idref'); $ref ? ($ref => 1) : () }
-      $LaTeXML::Post::DOCUMENT->findnodes("descendant-or-self::ltx:XMRef[\@idref]", $content_node);
-    return unless %xmrefs;    # certainly not usable if no refs in the dual.
-    my $ancestor = $currentnode;
-    while ($$ancestor != $$container && !$xmrefs{ $ancestor->getAttribute('xml:id') || '' }) {
-      $ancestor = $ancestor->parentNode; }
-    return if $$ancestor == $$container; }
-  # 1--end. We reach here only with semantic nodes in hand (or the logic has a Bug).
-  # 2. Bookkeep the semantic information.
-  my ($meaning, $arg);
-  if (my $current_meaning = $currentnode->getAttribute('meaning')) {
-    $meaning = $current_meaning; }
-  elsif ($current_node_name eq 'ltx:XMDual') {
-    $meaning = $self->build_semantic_attr($currentnode->firstChild); }
-  elsif ($current_node_name eq 'ltx:XMApp') {
-# Tricky, what is the best way to figure out if the operator is presentable vs implied? Check if it has _a11y=done?
-    my $op_node = $currentnode->firstChild;
-    my $op = $op_node->getAttribute('_a11y') ? $A11Y_ARG_MARK . 'op' : p_getAttribute($op_node, 'meaning');
-    if ($op) {    # annotate only if we knew a 'meaning' attribute, for the special markup scenarios
-      $meaning = "$op(" . join(",", map { $A11Y_ARG_MARK . $_ } 1 .. scalar(element_nodes($currentnode)) - 1) . ')'; }
+  my $meaning;
+  my $name                 = getQName($node);
+  my $source_name          = getQName($sourcenode);
+  my $src_parent           = $sourcenode->parentNode;
+  my $src_parent_name      = getQName($src_parent);
+  my $src_grandparent      = $src_parent->parentNode;
+  my $src_grandparent_name = getQName($src_grandparent);
+  my $current_node_name    = getQName($currentnode);
+  my $current_parent_name  = getQName($currentnode->parentNode);
+  # tokens are simplest - if we know of a meaning, use that for accessibility
+  if ($source_name eq 'ltx:XMTok') {
+    if (my $token_meaning = $sourcenode->getAttribute('meaning')) {
+      if ($src_grandparent_name eq 'ltx:XMDual') {
+        # often an XMDual contains the participating tokens of a transfix notation
+        # and those tokens carry the same meaning as the top-level dual operation.
+        # in those cases, don't tag the tokens, only tag the top-level dual node
+        my $dual_meaning = $src_grandparent->firstChild->firstChild->getAttribute('meaning');
+        $meaning = $token_meaning if ($token_meaning ne $dual_meaning); }
+      else {    # just copy the meaning in the usual case
+        $meaning = $token_meaning; } } }
+  elsif ($source_name eq 'ltx:XMApp') {
+    my @src_children = $sourcenode->childNodes;
+    my $arg_count    = scalar(@src_children) - 1;
+    # Ok, so we need to disentangle the case where the operator XMTok is preserved in pmml,
+    # and the case where it isn't. E.g. in \sqrt{x} we get a msqrt wrapper, but no dedicated token
+    # so we need to mark the literal "square-root" in msqrt
+    my $op_literal = $src_children[0]->getAttribute('meaning');
+    if ($op_literal && $name ne 'm:mrow') { # assume we have phased out the operator node. Are there counter-examples?
+      $meaning = $op_literal . '(' . join(",", map { '@' . $_ } (1 .. $arg_count)) . ')'; }
+    elsif ($name eq 'm:mrow') {
+      # usually an mrow keeps the operator token in its children as an <mo> (or such)
+      # when doesn't it? one example is "multirelation", is there a general pattern?
+      if ($op_literal eq 'multirelation') {
+        $meaning = $op_literal . '(' . join(",", map { '@' . $_ } (1 .. $arg_count)) . ')'; }
+      else {    # default case, assume we'll find the @op inside
+        $meaning = '@op(' . join(",", map { '@' . $_ } (1 .. $arg_count)) . ')'; } } }
+  elsif ($source_name eq 'ltx:XMDual' and $current_node_name eq 'ltx:XMWrap') {
+# Duals are tricky, we'd like to annotate them on the top-level only, while still annotating the inner structure as needed
+# top-level is (mostly? always?) available when we are examining an XMWrap, use that as a guide for now.
+# If no wrap is present, the inner contents should suffice in annotation
+    my $content_child = $sourcenode->firstChild;
+    my $op_literal;
+    if (getQName($content_child) eq 'ltx:XMRef') {
+      $op_literal = '@op'; # important: we have a clear match in the presentation, so the operator will have an arg
+      $content_child = $LaTeXML::Post::DOCUMENT->realizeXMNode($content_child); }
+    my $op_node = getQName($content_child) eq 'ltx:XMTok' ? $content_child : $content_child->firstChild;
+    $op_literal = $op_literal || $op_node->getAttribute('meaning') || '@op';
+    my @arg_nodes = $content_child->childNodes;
+    my $arg_count = scalar(@arg_nodes) - 1;
+    $meaning = $op_literal . '(' . join(",", map { '@' . $_ } (1 .. $arg_count)) . ')'; }
+  # if we found some meaning, attach it as an accessible attribute
+  if ($meaning) {
+    if (ref $node eq 'ARRAY') {
+      $$node[1]{'data-semantic'} = $meaning; }
     else {
-      # otherwise, take the liberty to delete all $A11Y_ARG_ATTR_NAME of direct children
-      for my $pmml_child (@$node[2 .. scalar(@$node) - 1]) {
-        p_removeAttribute($pmml_child, $A11Y_ARG_ATTR_NAME); } } }
+      $node->setAttribute('data-semantic', $meaning); } }
 
-# 3. Bookkeep "arg" information
-# (careful, can be arbitrary deep in a dual content tree)
-# also, not so easy to disentangle - a node nested deeply inside a dual may be _either_ referenced in the dual (primary)
-# _or_ a classic direct child of an intermediate XMApp. So we test until we find an $arg:
-  my $source_id = $container && $currentnode->getAttribute('xml:id');
-  if ($container && $source_id) {
-    $arg = build_arg_attr($container->firstChild, $source_id); }
-  if (!$arg && ($current_parent_name eq 'ltx:XMApp')) {    # normal apply case
-        # note we can only do this simple check because we filtered out all embellishments in step 1.
-    my $position = $LaTeXML::Post::DOCUMENT->findvalue("count(preceding-sibling::*)", $currentnode);
-    $arg = $position || 'op'; }
+  # Part II: Bottom-up. Also check if argument of higher parent notation, mark if so.
+  my $arg;
+  my $index = 0;
+  if ((my $fragid = $sourcenode->getAttribute('fragid')) &&
+    # duals are again special, since they source many nodes
+    # we only want to handle the top XMWrap presentation
+    ($source_name ne 'ltx:XMDual' or $current_node_name eq 'ltx:XMWrap')) {
 
-  p_setAttribute($node, $A11Y_NAME_ATTR_NAME, $meaning) if $meaning;
-  p_setAttribute($node, $A11Y_ARG_ATTR_NAME,  $arg)     if $arg;
-  $$self{a11y_arg_by_id}{$source_id} = $arg if ($source_id && $arg);
-  return; }
-
-# Given *some* content descendant of an ltx:XMDual, compute its corresponding a11y "semantic" attribute
-#  (can be called in recursively)
-sub build_semantic_attr {
-  my ($self, $node, $prefix) = @_;
-  my $name = getQName($node);
-  if ($name eq 'ltx:XMTok') {
-    return $node->getAttribute('meaning') || $node->getAttribute('name') || 'unknown'; }
-  elsif ($name eq 'ltx:XMRef') {
-    # iff the ref-ed node had a usable semantics, annotate
-    if (my $id = $node->getAttribute('idref')) {
-      if (my $arg = $$self{a11y_arg_by_id}{$id}) {
-        return $A11Y_ARG_MARK . $arg; } }
-    # if not set, not possible to annotate, so leave blank.
-    return ''; }
-  elsif ($name eq 'ltx:XMApp') {
-    my @arg_nodes = element_nodes($node);
-    my $op_node   = shift @arg_nodes;
-    my $op;
-    my $op_id = $op_node->getAttribute('idref');
-    if ($op_id && ($op = $$self{a11y_arg_by_id}{$op_id})) {
-      $op = $A11Y_ARG_MARK . $op; }
-    elsif (getQName($op_node) eq 'ltx:XMTok') {
-      $op = ($op_node && $op_node->getAttribute('meaning')) || $A11Y_ARG_MARK . 'op'; }
-    else {
-      $op = $self->build_semantic_attr($op_node, ($prefix ? ($prefix . "_op") : 'op')); }
-    my @arg_strings = ();
-    my $index       = 0;
-    for my $arg_node (@arg_nodes) {
-      $index++;
-      my $arg_id     = $arg_node->getAttribute('idref');
-      my $arg_cached = $arg_id && $$self{a11y_arg_by_id}{$arg_id};
-      if ($arg_cached) {
-        push @arg_strings, $A11Y_ARG_MARK . $arg_cached; }
+    # fragid-carrying nodes always  have an arg annotation
+    # step 1. find their dual
+    my $dual_node = $sourcenode->parentNode;
+    while (getQName($dual_node) ne 'ltx:XMDual') {
+      $dual_node = $dual_node->parentNode; }
+    my $content_child = $dual_node->firstChild;
+    my @content_nodes = getQName($content_child) eq 'ltx:XMApp' ? $content_child->childNodes : ();
+    my $index         = 0;
+    while (my $content_arg = shift @content_nodes) {
+      if (getQName($content_arg) eq 'ltx:XMRef' and $content_arg->getAttribute('idref') eq $fragid) {
+        if ($index) {
+          $arg = $index; }
+        else {
+          $arg = 'op'; }
+        last; }
       else {
-        push @arg_strings, $self->build_semantic_attr($arg_node, $prefix ? ($prefix . "_$index") : $index); } }
-# else {
-#   push @arg_strings, $A11Y_ARG_MARK . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
-    return $op . '(' . join(",", @arg_strings) . ')'; }
-  else {
-    print STDERR "Warning:unknown XMDual content child '$name' will default $A11Y_NAME_ATTR_NAME attribute to 'unknown'\n";
-    return 'unknown'; } }
-
-# Given the first (content) child of an ltx:XMDual, and an idref value, compute the corresponding "arg" attribute for that XMRef
-sub build_arg_attr {
-  my ($content_node, $idref) = @_;
-  my ($ref_node) = $LaTeXML::Post::DOCUMENT->findnodes(
-    "descendant-or-self::ltx:XMRef[\@idref=\"" . $idref . "\"][1]", $content_node);
-  return '' unless $ref_node;
-  my $path     = '';
-  my $ancestor = $ref_node;
-  while ($$ancestor != $$content_node) {
-    my $position = $LaTeXML::Post::DOCUMENT->findvalue("count(preceding-sibling::*)", $ancestor);
-    $path     = $path ? ($position . '_' . $path) : $position;
-    $ancestor = $ancestor->parentNode; }
-  # TODO: Think this through... the underscores are gnarly.
-  # for now, switch them to numbers.
-  if ($path) {
-    my $count = 1 + ($content_node->getAttribute('_attr_count') || 0);
-    $content_node->setAttribute('_attr_count', $count);
-    return "$count";
-  } elsif (scalar(element_nodes($content_node)) > 1) {
-    return "op";
-} else { return '1'; } }
+        $index++; } } }
+  elsif ($src_parent_name eq 'ltx:XMApp' && $src_grandparent_name ne 'ltx:XMDual' && $current_parent_name ne 'ltx:XMWrap') {
+    # Handle applications, but not inside duals - those should be handled when entering the dual
+    my $op_node = $src_parent->firstChild;
+    if ($op_node->getAttribute('meaning')) {    # only annotated applications we understand
+      my $prev_sibling = $sourcenode;
+      while ($prev_sibling = $prev_sibling->previousSibling) {
+        $index++ if isElementNode($prev_sibling); }
+      if ($index == 0) {
+        $arg = 'op'; }
+      else {
+        $arg = $index; } } }
+  if ($arg) {
+    if (ref $node eq 'ARRAY') {
+      $$node[1]{'data-arg'} = $arg; }
+    else {
+      $node->setAttribute('data-arg', $arg); } }
+  return; }
 
 #================================================================================
 # Presentation MathML with Line breaking

@@ -15,91 +15,43 @@ use strict;
 use warnings;
 use LaTeXML::Package;
 
-RequirePackage('latexml');
-RequirePackage('a11yeqn');
-
-our $a11y_annotations_enabled = 1;    # on by default
-DeclareOption('mark',   sub { $a11y_annotations_enabled = 1; return; });
-DeclareOption('nomark', sub { $a11y_annotations_enabled = 0; return; });
-ProcessOptions();
-
-if ($a11y_annotations_enabled) {
-  DefConstructorI(T_CS('\@request@math@a11y'), undef, "<?latexml a11y='enabled'?>");
-  AtBeginDocument(T_CS('\@request@math@a11y')); }
-
-# NOTE: demonstration-oriented binding, all names and definitions subject to change without notice.
+## 0. Semantic infrastructure
+DefConstructor('\meaning{}{}', '#2', afterConstruct => sub {
+    my ($doc, $whatsit) = @_;
+    my $apply = $doc->getNode->lastChild;
+    if ($apply->localName eq 'XMApp') {    # should be an apply, if by design
+      $apply->setAttribute('meaning', ToString($whatsit->getArg(1))); } },
+  bounded => 1, requireMath => 1);
 
 # Embellishment is hard to write, hard to speak, but describes exactly several cases
 # I will abbreviate it "emb", for now, and use it as a prefix
+DefConstructor('\emb@atom{}{}',
+  '<ltx:XMDual>'
+    . '<ltx:XMTok meaning="#1" />'
+    . '<ltx:XMWrap>#2</ltx:XMWrap>'
+    . '</ltx:XMDual>',
+  bounded => 1, requireMath => 1);
 
-# \emb@atom{meaning}{presentation}
-DefMacro('\emb@atom{}{}',        '\DUAL[hide_content_reversion=true]{\@CSYMBOL{#1}}{\@WRAP{#2}}');
-DefMacro('\emb@build@apply{}{}', '\DUAL[hide_content_reversion=true]{\@APPLY{#1}}{\@WRAP{#2}}');
+DefMacro('\emb@base{}{}{}', sub {
+    my ($gullet, $meaning, $base, $emb) = @_;
+    # Package::dualize_arglist seems to be doing this with more sophistication,
+    # a good bit to read if we ever need to build more infra here.
+    # for now, fast and loose, these don't get saved and are only for local association
+    my $id_token  = T_OTHER("id" . int(rand(10000)));
+    my $ref_token = Invocation(T_CS('\@XMRef'), $id_token);
+    my $arg_token = Invocation(T_CS('\@XMArg'), $id_token, $base);
+    return Invocation(T_CS('\emb@base@build'), $meaning, $ref_token, Tokens($arg_token, $emb))->unlist;
+});
 
-sub emb_apply {
-  my ($gullet, $base, $meaning, $emb, $invert_to_prefix) = @_;
-  my ($cargs, $pargs) = dualize_arglist('#1', $base);
-  my $ref_base     = $$cargs[0];
-  my $arg_base     = $$pargs[0];
-  my $presentation = $invert_to_prefix ? Tokens($emb, $arg_base) : Tokens($arg_base, $emb);
-  return Invocation(T_CS('\emb@build@apply'),
-    Tokens(Invocation(T_CS('\@CSYMBOL'), $meaning), $ref_base),
-    $presentation)->unlist; }
-
-sub emb_apply_two {    # one-or-two operations, can't fully reuse the simple case...
-  my ($gullet, $base, $op1_meaning, $op1_pres, $op2_meaning, $op2_pres, $invert_to_prefix) = @_;
-  if (!$op2_meaning && !$op2_pres) {    # one operation, use the simple apply call
-    return emb_apply($gullet, $base, $op1_meaning, $op1_pres, $invert_to_prefix); }
-  # Case where we have two consecutive operations
-  my ($cargs, $pargs) = dualize_arglist('#1', $base);
-  my $ref_base = $$cargs[0];
-  my $arg_base = $$pargs[0];
-
-  my $pres_tokens = $invert_to_prefix ? Tokens($op2_pres, $op1_pres, $arg_base) : Tokens($arg_base, $op1_pres, $op2_pres);
-  my $presentation = Invocation(T_CS('\@WRAP'), $pres_tokens);
-  my $content      = Invocation(T_CS('\@APPLY'), Invocation(T_CS('\@CSYMBOL'), $op2_meaning),
-    Invocation(T_CS('\@APPLY'), Invocation(T_CS('\@CSYMBOL'), $op1_meaning), $ref_base));
-  return Invocation(T_CS('\DUAL'), undef, $content, $presentation)->unlist; }
-
-# Two operators acting on base in sequence, commonly alternate scripts ^m_n.
-# \emb@apply{base}{op1 meaning}{op1 pres}[op2 meaning][op2 pres]
-DefMacro('\emb@apply{}{}{}[][]', \&emb_apply_two);
-
-# As with \emb@apply, but the presentation is right-to-left prefix "op2_pres op1_pres base"
-# \emb@preapply{base}{op1 meaning}{op1 pres}[op2 meaning][op2 pres]
-DefMacro('\emb@preapply{}{}{}[][]', sub { emb_apply_two(@_, 1); });
-
-# ADHOC for the very awkward example we have so far.
-# and the order of presentation args is inverted, while the semantic one is kept.
-# Example \PrePostArgCrosswise{x}{median}{\overline}{index}{_}{i}
-DefMacro('\PrePostArgCrosswise{}{}{}{}{}{}', sub {
-    my ($gullet, $base, $op1_meaning, $op1_pres, $op2_meaning, $op2_pres, $op2_rhs_var) = @_;
-    my ($cargs,    $pargs)       = dualize_arglist('#1#2', $base, $op2_rhs_var);
-    my ($ref_base, $ref_rhs_var) = @$cargs;
-    my ($arg_base, $arg_rhs_var) = @$pargs;
-
-    my $presentation = Tokens(Tokens($op1_pres, $arg_base), $op2_pres, $arg_rhs_var);
-    my $content      = Tokens(Invocation(T_CS('\@CSYMBOL'), $op1_meaning),
-      Invocation(T_CS('\@APPLY'), Tokens(
-          Invocation(T_CS('\@CSYMBOL'), $op2_meaning),
-          $ref_base, $ref_rhs_var)));
-    return Invocation(T_CS('\emb@build@apply'), $content, $presentation)->unlist; });
-
-# ADHOC - terrible low-level soup macro with 7 arguments,
-# just an example of things being possible...
-# \PostArgsCrosswise{x}{derivative-implicit-variable}{^}{\derivemark{1}}{index}{_}{i}
-DefMacro('\PostArgsCrosswise{}{}{}{}{}{}{}', sub {
-    my ($gullet, $base, $op1_meaning, $op1_pres, $op1_rhs_var, $op2_meaning, $op2_pres, $op2_rhs_var) = @_;
-    my ($cargs, $pargs) = dualize_arglist('#1#2#3', $base, $op1_rhs_var, $op2_rhs_var);
-    my ($ref_base, $ref_rhs_var1, $ref_rhs_var2) = @$cargs;
-    my ($arg_base, $arg_rhs_var1, $arg_rhs_var2) = @$pargs;
-
-    my $presentation = Tokens(Tokens($arg_base, $op1_pres, $arg_rhs_var1), $op2_pres, $arg_rhs_var2);
-    my $content      = Tokens(Invocation(T_CS('\@CSYMBOL'), $op1_meaning),
-      Invocation(T_CS('\@APPLY'), Tokens(
-          Invocation(T_CS('\@CSYMBOL'), $op2_meaning), $ref_base, $ref_rhs_var2)),
-      $ref_rhs_var1);
-    return Invocation(T_CS('\emb@build@apply'), $content, $presentation)->unlist; });
+DefConstructor('\emb@base@build{}{}{}',
+  '<ltx:XMDual>'
+    . '<ltx:XMApp>'
+    . '<ltx:XMTok meaning="#1"/>'
+    . '#2'
+    . '</ltx:XMApp>'
+    . '<ltx:XMWrap>#3</ltx:XMWrap>'
+    . '</ltx:XMDual>',
+  bounded => 1, requireMath => 1);
 
 ## I. Calculus
 DefConstructor('\diffd', '<ltx:XMTok meaning="differential" name="diffd" role="DIFFOP">d</ltx:XMTok>');
@@ -115,21 +67,10 @@ DefMath('\deriv[]{}{}',
 
 DefMath('\integral{}{}', '\int #1 \diffd #2', meaning => 'integral');
 
-DefConstructor('\meaning{}{}', '#2', afterConstruct => sub {
-    my ($doc, $whatsit) = @_;
-    my $apply = $doc->getNode->lastChild;
-    if ($apply->localName eq 'XMApp') {    # should be an apply, if by design
-      $apply->setAttribute('meaning', ToString($whatsit->getArg(1))); } },
-  bounded => 1, requireMath => 1);
-
-DefMacro('\power{}{}', '\meaning{power}{#1^{#2}}');
-
-# These still need work, since currently we get
-# annotations "transpose(#1,#2)" and "frobulator(#1,#2)"
-# instead of the desired "transpose(#1)" and "frobulator"
-# I guess this needs a different type of XMath structural pattern...
-DefMacro('\transpose{}', '\meaning{transpose}{#1^T}');
-DefMacro('\frobulator',  '\meaning{frobulator}{x\'}');
+## II. Scripts
+DefMacro('\power{}{}',   '\meaning{power}{#1^{#2}}');
+DefMacro('\frobulator',  '\emb@atom{frobulator}{x\'}');
+DefMacro('\transpose{}', '\emb@base{transpose}{#1}{^T}');
 
 ########
 1;

@@ -115,157 +115,21 @@ DefMath('\deriv[]{}{}',
 
 DefMath('\integral{}{}', '\int #1 \diffd #2', meaning => 'integral');
 
-## II. Scripts
-DefMacro('\@sup@apply{}{}', sub {
-    my ($gullet, $base, $script) = @_;
-    my ($cargs, $pargs) = dualize_arglist('#1#2', $base, $script);
-    return Invocation(T_CS('\emb@build@apply'),
-      Tokens($$cargs[1], $$cargs[0]),
-      Invocation(T_CS('\@SUPERSCRIPT'), @$pargs))->unlist; });
-DefMacro('\supop{}{}{}', '\@sup@apply{#1}{\emb@atom{#2}{#3}}');
-DefMacro('\@sub@apply{}{}', sub {
-    my ($gullet, $base, $script) = @_;
-    my ($cargs, $pargs) = dualize_arglist('#1#2', $base, $script);
-    return Invocation(T_CS('\emb@build@apply'),
-      Tokens($$cargs[1], $$cargs[0]),
-      Invocation(T_CS('\@SUBCRIPT'), @$pargs))->unlist; });
-DefMacro('\subop{}{}{}', '\@sub@apply{#1}{\emb@atom{#2}{#3}}');
+DefConstructor('\meaning{}{}', '#2', afterConstruct => sub {
+    my ($doc, $whatsit) = @_;
+    my $apply = $doc->getNode->lastChild;
+    if ($apply->localName eq 'XMApp') {    # should be an apply, if by design
+      $apply->setAttribute('meaning', ToString($whatsit->getArg(1))); } },
+  bounded => 1, requireMath => 1);
 
-DefMath('\power{}{}', "{#1^{#2}}", meaning => 'power',
-  reversion              => '#1^{#2}',
-  hide_content_reversion => 1);
-DefMath('\fnpower{}{}', "{#1^{#2}}", meaning => 'functional-power',
-  reversion => '#1^{#2}', hide_content_reversion => 1);
-DefMath('\fninverse{}', "#1^{-1}", meaning => "inverse", role => 'OPFUNCTION',
-  reversion => '#1^{-1}', hide_content_reversion => 1);
-DefMath('\laplacian', '\nabla^2', meaning => 'Laplacian', role => 'OPERATOR',
-  hide_content_reversion => 1);
-DefMath('\index{}{}', "{#1_{#2}}", meaning => 'index',
-  reversion => '#1_{#2}', hide_content_reversion => 1);
+DefMacro('\power{}{}', '\meaning{power}{#1^{#2}}');
 
-# only mark the script as a dual, so that we can remix it
-DefMacro('\indexArg{}', sub {
-    my ($gullet, $arg)   = @_;
-    my ($cargs,  $pargs) = dualize_arglist('#1', $arg);
-    return Invocation(T_CS('\emb@build@apply'),
-      Tokens(Invocation(T_CS('\@CSYMBOL'), 'index'), $$cargs[0]),
-      Tokens(T_SUB,                                  $$pargs[0]))->unlist; });
-DefMacro('\supop{}{}{}', '\@sup@apply{#1}{\emb@atom{#2}{#3}}');
+# These still need work, since currently we get
+# annotations "transpose(#1,#2)" and "frobulator(#1,#2)"
+# instead of the desired "transpose(#1)" and "frobulator"
+# I guess this needs a different type of XMath structural pattern...
+DefMacro('\transpose{}', '\meaning{transpose}{#1^T}');
+DefMacro('\frobulator',  '\meaning{frobulator}{x\'}');
 
-DefMacro('\frobulator', '\emb@atom{frobulator}{x\'}');
-
-DefMacro('\transpose{}', '\supop{#1}{transpose}{T}');
-DefMacro('\adjoint{}',   '\supop{#1}{adjoint}{\dagger}');
-# This works well, but can't be remixed crosswise as \median{x}_i:
-DefMacro('\median', '\emb@atom{median}{\overline}');
-
-# What I Really Want to Say here, but can't is likely:
-# DefMath('\derivemark{}', '\derivemark@pres{#1}', meaning=>'#1');
-DefMacro('\derivemark{}', sub {
-    my ($gullet, $token) = @_;
-    # Dualizing the arglist only works if we are going to keep the same token at the end
-    # in the case of 2 --> '' , this fails. So, obtain the presentation right away to figure this out
-
-    # we need to digest due to \@XMArg being a constructor
-    my $mark = ToString(Digest($token));
-    my ($content, $presentation);
-    if ($mark =~ /^\d$/) {    # single digit, add primes
-      $content      = $token;
-      $presentation = Tokens(map { T_CS('\prime') } 1 .. int($mark)) }
-    else {
-      # assume an id, wrap in parens
-      my ($cargs, $pargs) = dualize_arglist('#1', $token);
-      $content      = $$cargs[0];
-      $presentation = Tokens(T_OTHER('('), $$pargs[0], T_OTHER(')')); }
-
-    return Invocation(T_CS('\DUAL'),
-      undef,                  # debugging that I missed this 'undef' argument was not fun.
-      $content,
-      Invocation(T_CS('\@WRAP'), $presentation))->unlist;
-});
-
-# curiously we need an indirection level, so that we point to the dual instead of
-# the content node of the dual. The a11y attribute generation does not support the following markup
-# at the moment:
-#
-# <XMDual>
-#   <XMApp>
-#     <XMTok meaning="derivative-implicit-variable" name="fnderive" role="UNKNOWN"/>
-#     <XMRef idref="p1.m1.1"/>
-#     <XMRef idref="p1.m1.2"/>
-#   </XMApp>
-#   <XMApp>
-#     <XMTok role="SUPERSCRIPTOP" scriptpos="post1"/>
-#     <XMTok font="italic" role="UNKNOWN" xml:id="p1.m1.1">f</XMTok>
-#     <XMDual>
-#       <XMTok font="italic" fontsize="70%" role="UNKNOWN" xml:id="p1.m1.2">n</XMTok>
-#       <XMWrap> ...
-#
-# We can only deal with 'p1.m1.2' pointing to the inner XMDual, rather than directly to its content "n"
-DefMacro('\fnderive{}{}', '\fnderive@build{#1}{\derivemark{#2}}');
-DefMath('\fnderive@build{}{}', '#1^#2',
-  meaning                => 'derivative-implicit-variable',
-  hide_content_reversion => 1);
-
-# piecewise functions
-DefMath('\defeq{}{}', '#1=#2', meaning => 'defined-as',
-  hide_content_reversion => 1);
-DefMacro('\lx@case@if{}{}', '\lx@apply{\lx@symbol{when} #1 #2}');
-
-## Circumfix, applicative:
-DefMath('\norm{}', '|\mathbf{#1}|', meaning => 'norm', role => 'ID',
-  reversion => '|\mathbf{#1}|', hide_content_reversion => 1);
-DefMath('\determinant{}', '|\mathbf{#1}|', meaning => 'determinant', role => 'ID',
-  reversion => '|\mathbf{#1}|', hide_content_reversion => 1);
-################################################################################################################
-
-# Declare some default common in K12 math when using this package:
-# Also, improve ergonomics of \lxDecalre to my (Deyan's) liking
-# TODO: Can we reuse this keyval from latexml.sty? How?
-DefKeyVal('Declare', 'role',    '', '');
-DefKeyVal('Declare', 'meaning', '', '');
-DefKeyVal('Declare', 'action',  '', '');
-DefKeyVal('Declare', 'replace', '', '');
-our %PRAGMA_ROLES = map { $_ => 1 }
-  qw(ATOM UNKNOWN ID ARRAY NUMBER PUNCT PERIOD RELOP LANGLE RANGLE MIDBAR LBRACE RBRACE METARELOP MODIFIEROP MODIFIER ARROW ADDOP MULOP BINOP POSTFIX FUNCTION OPFUNCTION TRIGFUNCTION APPLYOP COMPOSEOP SUPOP OPEN SCRIPTOPEN CLOSE MIDDLE VERTBAR SINGLEVERTBAR BIGOP SUMOP INTOP LIMITOP DIFFOP OPERATOR POSTSUBSCRIPT POSTSUPERSCRIPT FLOATSUPERSCRIPT FLOATSUBSCRIPT);
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-DefMacro('\pragma OptionalMatch:* {}{}', sub { # Limitation: never use commas in the symbol/notation contents
-    my ($gullet, $star, $properties, $notations) = @_;
-    my @declarations       = ();
-    my $notations_expanded = ToString($notations);
-    $notations_expanded =~ s/\?/\\WildCard[]/g;
-    my @notations  = $star ? $notations_expanded : split(/\s*,\s*/, $notations_expanded);
-    my @properties = split(/\s*,\s*/, ToString($properties));
-    for my $notation (@notations) {
-      my $kvprops = LaTeXML::Core::KeyVals->new('KV', 'Declare', assign => T_OTHER('='), punct => T_OTHER(','));
-      for my $p (@properties) {                # extend with more of the lxDeclare capabilities? scopes?
-        if ($PRAGMA_ROLES{$p}) {
-          $kvprops->setValue('role', $p); }
-        elsif ($p =~ /^(pre|post)\:/) {
-          $kvprops->setValue('action', $p); }
-        else {
-          $kvprops->setValue('meaning', $p); } }
-      push @declarations,
-        Invocation(T_CS('\lxDeclare'), undef, $kvprops,
-        Tokens(T_MATH, Tokenize($notation), T_MATH)); }
-    return @declarations; });
-
-# Example pragmas, as incldued with the tiny accessibility showcase:
-#
-# disabled by default here, since they may assume too much
-#
-# PushValue('@at@begin@document', Tokenize(<<'EOL'));
-# \pragma{FUNCTION}{f,g,h}
-# \pragma{ID}{a,b,c,d,n,m,x,y,z}
-# \pragma{index}{?_?}
-# \pragma{power}{?^?}
-# \pragma{Pochhamer-symbol,ID}{\left(?\right)_?}
-# \pragma{Legendre-symbol,ID}{\left(?|?\right)}
-# \pragma{BesselJ,FUNCTION}{J_?}
-# \pragma*{inner-product,ID}{\left<\mathbf{?},\mathbf{?}\right>}
-# \pragma*{pre:\@APPLYFUNCTION}{\left(?,?;?|?\right)}
-# EOL
-#
+########
 1;

@@ -16,6 +16,8 @@ use LaTeXML::Global;
 use LaTeXML::Common::Object;
 use LaTeXML::Common::Error;
 use LaTeXML::Common::XML;
+use LaTeXML::Core::Token qw(T_CS T_MATH);
+use LaTeXML::Core::Tokens qw(Tokens);
 
 sub new {
   my ($class, $mode, @specs) = @_;
@@ -180,6 +182,32 @@ sub applyClause {
     Error('misdefined', '<rewrite>', undef, "Unknown directive '$op' in Compiled Rewrite spec"); }
   return; }
 
+## EXPERIMENTAL: This is an early experiment and needs to be refactored before it can be considered for serious use
+sub action_insert {
+  my ($document, $direction, $extra, $tree) = @_;
+  print STDERR "Tree: ", $tree->toString(1), "\n";
+  my $anchor;
+  if ($direction eq 'pre') {
+    $anchor = $tree->previousSibling; }
+  elsif ($direction eq 'post') {
+    $anchor = $tree->nextSibling; }
+  if ($anchor) {    # What should we do if no anchor? Skip?
+                    # Carry out the operation, inserting whatever nodes.
+    my $parent   = $anchor->parentNode;
+    my $end_mark = $parent->lastChild;
+    $document->setNode($parent);
+    &$extra($document);
+    my @inserted = ();
+    my @children = $parent->childNodes;
+    while (my $child = pop @children) {
+      last unless ($$child != $$end_mark);
+      $child->unbindNode;
+      push @inserted, $child; }
+    for my $newchild (@inserted) {
+      $parent->insertAfter($newchild, $anchor);
+      $document->recordNodeIDs($newchild); } }
+  return; }
+
 # Set attributes for an encapsulated tree (ie. a decorated symbol as symbol itself)
 sub setAttributes_encapsulate {
   my ($document, $attributes, @nodes) = @_;
@@ -323,6 +351,20 @@ sub compileClause {
     if (ref $pattern eq 'CODE') { }
     else {
       $pattern = $self->compile_replacement($document, $pattern); } }
+  elsif ($op eq 'action') {
+    if (ref $pattern eq 'CODE') { }
+    # HACK: it appears this is a stage already **too late** to handle pre/post directive parsing
+    #       maybe what I should consider instead is having a "pre:action" and "post:action" KEY
+    #       which can be parsed via $op, keeping $pattern handled identically to the 'replace' case?
+    elsif (ToString($pattern) =~ /^(pre|post)[:].(.+)$/) {
+      my $direction = $1;
+      my $extra     = $self->compile_replacement($document, Tokens(T_MATH, T_CS("\\$2"), T_MATH));
+      $pattern = sub {
+        my ($tree) = @_;
+        action_insert($document, $direction, $extra, $tree); } }
+    else {
+      Fatal('misdefined', '<rewrite>', undef,
+        "Can't generate 'action' for arbitrary tokens.", ToString($pattern)); } }
   elsif ($op eq 'regexp') {
     $pattern = $self->compile_regexp($pattern); }
   Debug("Compiled clause $oop=>" . ToString($opattern) . "  ==> $op=>" . ToString($pattern))
@@ -534,7 +576,7 @@ sub domToXPath_seq {
 
 __END__
 
-=pod 
+=pod
 
 =head1 NAME
 

@@ -20,4 +20,236 @@ RequirePackage('latexml');
 DefConstructorI(T_CS('\@request@math@a11y'), undef, "<?latexml a11y='enabled'?>");
 AtBeginDocument(T_CS('\@request@math@a11y'));
 
+# NOTE: demonstration-oriented binding, all names and definitions subject to change without notice.
+
+# Embellishment is hard to write, hard to speak, but describes exactly several cases
+# I will abbreviate it "emb", for now, and use it as a prefix
+
+# \emb@atom{meaning}{presentation}
+DefMacro('\emb@atom{}{}',        '\DUAL[hide_content_reversion=true]{\@CSYMBOL{#1}}{\@WRAP{#2}}');
+DefMacro('\emb@build@apply{}{}', '\DUAL[hide_content_reversion=true]{\@APPLY{#1}}{\@WRAP{#2}}');
+
+sub emb_apply {
+  my ($gullet, $base, $meaning, $emb, $invert_to_prefix) = @_;
+  my ($cargs, $pargs) = dualize_arglist('#1', $base);
+  my $ref_base     = $$cargs[0];
+  my $arg_base     = $$pargs[0];
+  my $presentation = $invert_to_prefix ? Tokens($emb, $arg_base) : Tokens($arg_base, $emb);
+  return Invocation(T_CS('\emb@build@apply'),
+    Tokens(Invocation(T_CS('\@CSYMBOL'), $meaning), $ref_base),
+    $presentation)->unlist; }
+
+sub emb_apply_two {    # one-or-two operations, can't fully reuse the simple case...
+  my ($gullet, $base, $op1_meaning, $op1_pres, $op2_meaning, $op2_pres, $invert_to_prefix) = @_;
+  if (!$op2_meaning && !$op2_pres) {    # one operation, use the simple apply call
+    return emb_apply($gullet, $base, $op1_meaning, $op1_pres, $invert_to_prefix); }
+  # Case where we have two consecutive operations
+  my ($cargs, $pargs) = dualize_arglist('#1', $base);
+  my $ref_base = $$cargs[0];
+  my $arg_base = $$pargs[0];
+
+  my $pres_tokens = $invert_to_prefix ? Tokens($op2_pres, $op1_pres, $arg_base) : Tokens($arg_base, $op1_pres, $op2_pres);
+  my $presentation = Invocation(T_CS('\@WRAP'), $pres_tokens);
+  my $content      = Invocation(T_CS('\@APPLY'), Invocation(T_CS('\@CSYMBOL'), $op2_meaning),
+    Invocation(T_CS('\@APPLY'), Invocation(T_CS('\@CSYMBOL'), $op1_meaning), $ref_base));
+  return Invocation(T_CS('\DUAL'), undef, $content, $presentation)->unlist; }
+
+# Two operators acting on base in sequence, commonly alternate scripts ^m_n.
+# \emb@apply{base}{op1 meaning}{op1 pres}[op2 meaning][op2 pres]
+DefMacro('\emb@apply{}{}{}[][]', \&emb_apply_two);
+
+# As with \emb@apply, but the presentation is right-to-left prefix "op2_pres op1_pres base"
+# \emb@preapply{base}{op1 meaning}{op1 pres}[op2 meaning][op2 pres]
+DefMacro('\emb@preapply{}{}{}[][]', sub { emb_apply_two(@_, 1); });
+
+# ADHOC for the very awkward example we have so far.
+# and the order of presentation args is inverted, while the semantic one is kept.
+# Example \PrePostArgCrosswise{x}{median}{\overline}{index}{_}{i}
+DefMacro('\PrePostArgCrosswise{}{}{}{}{}{}', sub {
+    my ($gullet, $base, $op1_meaning, $op1_pres, $op2_meaning, $op2_pres, $op2_rhs_var) = @_;
+    my ($cargs,    $pargs)       = dualize_arglist('#1#2', $base, $op2_rhs_var);
+    my ($ref_base, $ref_rhs_var) = @$cargs;
+    my ($arg_base, $arg_rhs_var) = @$pargs;
+
+    my $presentation = Tokens(Tokens($op1_pres, $arg_base), $op2_pres, $arg_rhs_var);
+    my $content      = Tokens(Invocation(T_CS('\@CSYMBOL'), $op1_meaning),
+      Invocation(T_CS('\@APPLY'), Tokens(
+          Invocation(T_CS('\@CSYMBOL'), $op2_meaning),
+          $ref_base, $ref_rhs_var)));
+    return Invocation(T_CS('\emb@build@apply'), $content, $presentation)->unlist; });
+
+# ADHOC - terrible low-level soup macro with 7 arguments,
+# just an example of things being possible...
+# \PostArgsCrosswise{x}{derivative-implicit-variable}{^}{\derivemark{1}}{index}{_}{i}
+DefMacro('\PostArgsCrosswise{}{}{}{}{}{}{}', sub {
+    my ($gullet, $base, $op1_meaning, $op1_pres, $op1_rhs_var, $op2_meaning, $op2_pres, $op2_rhs_var) = @_;
+    my ($cargs, $pargs) = dualize_arglist('#1#2#3', $base, $op1_rhs_var, $op2_rhs_var);
+    my ($ref_base, $ref_rhs_var1, $ref_rhs_var2) = @$cargs;
+    my ($arg_base, $arg_rhs_var1, $arg_rhs_var2) = @$pargs;
+
+    my $presentation = Tokens(Tokens($arg_base, $op1_pres, $arg_rhs_var1), $op2_pres, $arg_rhs_var2);
+    my $content      = Tokens(Invocation(T_CS('\@CSYMBOL'), $op1_meaning),
+      Invocation(T_CS('\@APPLY'), Tokens(
+          Invocation(T_CS('\@CSYMBOL'), $op2_meaning), $ref_base, $ref_rhs_var2)),
+      $ref_rhs_var1);
+    return Invocation(T_CS('\emb@build@apply'), $content, $presentation)->unlist; });
+
+## I. Calculus
+DefConstructor('\diffd', '<ltx:XMTok meaning="differential" name="diffd" role="DIFFOP">d</ltx:XMTok>');
+DefMath('\deriv[]{}{}',
+  '\frac{\@MAYBEAPPLY{\@SUPERSCRIPT{\diffd}{#1}}{#2}}'
+    . '{\@SUPERSCRIPT{\@APPLY{\diffd #3}}{#1}}',
+  meaning => 'derivative', reorder => [2, 3, 1],
+  # afterDigest => sub {
+  #   # NOTE: arg 2 will be wrapped in XMRef!
+  #   $_[1]->setProperty(role => 'DIFFOP') if checkDiffOp($_[1]);
+  #   return; },
+  hide_content_reversion => 1);
+
+DefMath('\integral{}{}', '\int #1 \diffd #2', meaning => 'integral');
+
+## II. Scripts
+DefMacro('\@sup@apply{}{}', sub {
+    my ($gullet, $base, $script) = @_;
+    my ($cargs, $pargs) = dualize_arglist('#1#2', $base, $script);
+    return Invocation(T_CS('\emb@build@apply'),
+      Tokens($$cargs[1], $$cargs[0]),
+      Invocation(T_CS('\@SUPERSCRIPT'), @$pargs))->unlist; });
+DefMacro('\supop{}{}{}', '\@sup@apply{#1}{\emb@atom{#2}{#3}}');
+DefMacro('\@sub@apply{}{}', sub {
+    my ($gullet, $base, $script) = @_;
+    my ($cargs, $pargs) = dualize_arglist('#1#2', $base, $script);
+    return Invocation(T_CS('\emb@build@apply'),
+      Tokens($$cargs[1], $$cargs[0]),
+      Invocation(T_CS('\@SUBCRIPT'), @$pargs))->unlist; });
+DefMacro('\subop{}{}{}', '\@sub@apply{#1}{\emb@atom{#2}{#3}}');
+
+DefMath('\power{}{}', "{#1^{#2}}", meaning => 'power',
+  reversion              => '#1^{#2}',
+  hide_content_reversion => 1);
+DefMath('\fnpower{}{}', "{#1^{#2}}", meaning => 'functional-power',
+  reversion => '#1^{#2}', hide_content_reversion => 1);
+DefMath('\fninverse{}', "#1^{-1}", meaning => "inverse", role => 'OPFUNCTION',
+  reversion => '#1^{-1}', hide_content_reversion => 1);
+DefMath('\laplacian', '\nabla^2', meaning => 'Laplacian', role => 'OPERATOR',
+  hide_content_reversion => 1);
+DefMath('\index{}{}', "{#1_{#2}}", meaning => 'index',
+  reversion => '#1_{#2}', hide_content_reversion => 1);
+
+# only mark the script as a dual, so that we can remix it
+DefMacro('\indexArg{}', sub {
+    my ($gullet, $arg)   = @_;
+    my ($cargs,  $pargs) = dualize_arglist('#1', $arg);
+    return Invocation(T_CS('\emb@build@apply'),
+      Tokens(Invocation(T_CS('\@CSYMBOL'), 'index'), $$cargs[0]),
+      Tokens(T_SUB,                                  $$pargs[0]))->unlist; });
+DefMacro('\supop{}{}{}', '\@sup@apply{#1}{\emb@atom{#2}{#3}}');
+
+DefMacro('\frobulator', '\emb@atom{frobulator}{x\'}');
+
+DefMacro('\transpose{}', '\supop{#1}{transpose}{T}');
+DefMacro('\adjoint{}',   '\supop{#1}{adjoint}{\dagger}');
+# This works well, but can't be remixed crosswise as \median{x}_i:
+DefMacro('\median', '\emb@atom{median}{\overline}');
+
+# What I Really Want to Say here, but can't is likely:
+# DefMath('\derivemark{}', '\derivemark@pres{#1}', meaning=>'#1');
+DefMacro('\derivemark{}', sub {
+    my ($gullet, $token) = @_;
+    # Dualizing the arglist only works if we are going to keep the same token at the end
+    # in the case of 2 --> '' , this fails. So, obtain the presentation right away to figure this out
+
+    # we need to digest due to \@XMArg being a constructor
+    my $mark = ToString(Digest($token));
+    my ($content, $presentation);
+    if ($mark =~ /^\d$/) {    # single digit, add primes
+      $content      = $token;
+      $presentation = Tokens(map { T_CS('\prime') } 1 .. int($mark)) }
+    else {
+      # assume an id, wrap in parens
+      my ($cargs, $pargs) = dualize_arglist('#1', $token);
+      $content      = $$cargs[0];
+      $presentation = Tokens(T_OTHER('('), $$pargs[0], T_OTHER(')')); }
+
+    return Invocation(T_CS('\DUAL'),
+      undef,                  # debugging that I missed this 'undef' argument was not fun.
+      $content,
+      Invocation(T_CS('\@WRAP'), $presentation))->unlist;
+});
+
+# curiously we need an indirection level, so that we point to the dual instead of
+# the content node of the dual. The a11y attribute generation does not support the following markup
+# at the moment:
+#
+# <XMDual>
+#   <XMApp>
+#     <XMTok meaning="derivative-implicit-variable" name="fnderive" role="UNKNOWN"/>
+#     <XMRef idref="p1.m1.1"/>
+#     <XMRef idref="p1.m1.2"/>
+#   </XMApp>
+#   <XMApp>
+#     <XMTok role="SUPERSCRIPTOP" scriptpos="post1"/>
+#     <XMTok font="italic" role="UNKNOWN" xml:id="p1.m1.1">f</XMTok>
+#     <XMDual>
+#       <XMTok font="italic" fontsize="70%" role="UNKNOWN" xml:id="p1.m1.2">n</XMTok>
+#       <XMWrap> ...
+#
+# We can only deal with 'p1.m1.2' pointing to the inner XMDual, rather than directly to its content "n"
+DefMacro('\fnderive{}{}', '\fnderive@build{#1}{\derivemark{#2}}');
+DefMath('\fnderive@build{}{}', '#1^#2',
+  meaning                => 'derivative-implicit-variable',
+  hide_content_reversion => 1);
+
+## Circumfix, applicative:
+DefMath('\norm{}', '|\mathbf{#1}|', meaning => 'norm', role => 'ID',
+  reversion => '|\mathbf{#1}|', hide_content_reversion => 1);
+DefMath('\determinant{}', '|\mathbf{#1}|', meaning => 'determinant', role => 'ID',
+  reversion => '|\mathbf{#1}|', hide_content_reversion => 1);
+################################################################################################################
+
+# Declare some default common in K12 math when using this package:
+# Also, improve ergonomics of \lxDecalre to my (Deyan's) liking
+# TODO: Can we reuse this keyval from latexml.sty? How?
+DefKeyVal('Declare', 'role',    '', '');
+DefKeyVal('Declare', 'meaning', '', '');
+DefKeyVal('Declare', 'action',  '', '');
+DefKeyVal('Declare', 'replace', '', '');
+our %PRAGMA_ROLES = map { $_ => 1 } qw(ID FUNCTION);
+DefMacro('\pragma OptionalMatch:* {}{}', sub { # Limitation: never use commas in the symbol/notation contents
+    my ($gullet, $star, $properties, $notations) = @_;
+    my @declarations       = ();
+    my $notations_expanded = ToString($notations);
+    $notations_expanded =~ s/\?/\\WildCard[]/g;
+    my @notations  = $star ? $notations_expanded : split(/\s*,\s*/, $notations_expanded);
+    my @properties = split(/\s*,\s*/, ToString($properties));
+    for my $notation (@notations) {
+      my $kvprops = LaTeXML::Core::KeyVals->new('KV', 'Declare', assign => T_OTHER('='), punct => T_OTHER(','));
+      for my $p (@properties) {                # extend with more of the lxDeclare capabilities? scopes?
+        if ($PRAGMA_ROLES{$p}) {
+          $kvprops->setValue('role', $p); }
+        elsif ($p =~ /^(pre|post)\:/) {
+          $kvprops->setValue('action', $p); }
+        else {
+          $kvprops->setValue('meaning', $p); } }
+      push @declarations,
+        Invocation(T_CS('\lxDeclare'), undef, $kvprops,
+        Tokens(T_MATH, Tokenize($notation), T_MATH)); }
+    return @declarations; });
+
+# Example pragmas, as incldued with the tiny accessibility showcase:
+#
+# disabled by default here, since they may assume too much
+#
+# PushValue('@at@begin@document', Tokenize(<<'EOL'));
+# \pragma{FUNCTION}{f,g,h}
+# \pragma{ID}{a,b,c,d,n,m,x,y,z}
+# \pragma{index}{?_?}
+# \pragma{power}{?^?}
+# \pragma{Pochhamer-symbol,ID}{\left(?\right)_?}
+# \pragma{Legendre-symbol,ID}{\left(?|?\right)}
+# \pragma{BesselJ,FUNCTION}{J_?}
+# \pragma*{inner-product,ID}{\left<\mathbf{?},\mathbf{?}\right>}
+# \pragma*{pre:\@APPLYFUNCTION}{\left(?,?;?|?\right)}
+# EOL
+#
 1;

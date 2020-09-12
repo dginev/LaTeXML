@@ -99,11 +99,12 @@ sub addAccessibilityAnnotations {
   return if $current_node_name eq 'ltx:XMath';
   return if $currentnode->getAttribute('_a11y');
   $currentnode->setAttribute('_a11y', 'done');
-  my $source_node_name = getQName($sourcenode);
+  my $source_node_name    = getQName($sourcenode);
+  my $current_parent      = $currentnode->parentNode;
+  my $current_parent_name = getQName($current_parent);
   my $container;
 # skip non-material dual presentation, which points to content nodes but should *not* carry annotations itself
-  if (($container = $LaTeXML::Post::DOCUMENT->findnode('ancestor::ltx:XMDual[1]', $currentnode)) and
-    (${ $currentnode->parentNode } != $$container)) {
+  if ($current_parent_name ne 'ltx:XMDual' and ($container = $LaTeXML::Post::DOCUMENT->findnode('ancestor::ltx:XMDual[1]', $currentnode))) {
 # also skip any embellishments in duals that are not semantic, a bit tricky since we need to check parent xmapps
     my $content_node = $container->firstChild;
     my %xmrefs       = map { my $ref = $_->getAttribute('idref'); $ref ? ($ref => 1) : () }
@@ -129,16 +130,16 @@ sub addAccessibilityAnnotations {
       for my $pmml_child (@$node[2 .. scalar(@$node) - 1]) {
         p_removeAttribute($pmml_child, 'data-arg'); } } }
   elsif ($source_node_name eq 'ltx:XMDual') {
-    $meaning = dual_content_to_semantic_attr($sourcenode->firstChild); }
+    $meaning = $self->build_semantic_attr($sourcenode->firstChild); }
 
 # 3. Bookkeep "arg" information
 # (careful, can be arbitrary deep in a dual content tree)
 # also, not so easy to disentangle - a node nested deeply inside a dual may be _either_ referenced in the dual (primary)
 # _or_ a classic direct child of an intermediate XMApp. So we test until we find an $arg:
   $container = $container || $LaTeXML::Post::DOCUMENT->findnode('ancestor::ltx:XMDual[1]', $sourcenode);
-  if ($container) {
-    my $id = $sourcenode->getAttribute('xml:id');
-    $arg = $id && dual_content_idref_to_data_attr($container->firstChild, $id); }
+  my $source_id = $sourcenode->getAttribute('xml:id');
+  if ($container && $source_id) {
+    $arg = build_arg_attr($container->firstChild, $source_id); }
   if (!$arg && (getQName($sourcenode->parentNode) eq 'ltx:XMApp')) {    # normal apply case
         # note we can only do this simple check because we filtered out all embellishments in step 1.
     my $position = $LaTeXML::Post::DOCUMENT->findvalue("count(preceding-sibling::*)", $sourcenode);
@@ -146,35 +147,52 @@ sub addAccessibilityAnnotations {
 
   p_setAttribute($node, 'data-semantic', $meaning) if $meaning;
   p_setAttribute($node, 'data-arg',      $arg)     if $arg;
+  $$self{a11y_arg_by_id}{$source_id} = $arg if $source_id && $arg;
   return; }
 
-# Given the first (content) child of an ltx:XMDual, compute its corresponding a11y "semantic" attribute
-sub dual_content_to_semantic_attr {
-  my ($node, $prefix) = @_;
+# Given *some* content descendant of an ltx:XMDual, compute its corresponding a11y "semantic" attribute
+#  (can be called in recursively)
+sub build_semantic_attr {
+  my ($self, $node, $prefix) = @_;
   my $name = getQName($node);
   if ($name eq 'ltx:XMTok') {
     return $node->getAttribute('meaning') || $node->getAttribute('name') || 'unknown'; }
   elsif ($name eq 'ltx:XMRef') {    # pass through case
-    return '#1'; }
+    if (my $id = $node->getAttribute('idref')) {
+      if (my $arg = $$self{a11y_arg_by_id}{$id}) {
+        return "#$arg"; } }
+    # default:
+    return $prefix ? ('#' . $prefix . '_1') : '#1'; }
   elsif ($name eq 'ltx:XMApp') {
-    my @arg_nodes   = element_nodes($node);
-    my $op_node     = shift @arg_nodes;
-    my $op          = ($op_node && $op_node->getAttribute('meaning')) || '#op';
+    my @arg_nodes = element_nodes($node);
+    my $op_node   = shift @arg_nodes;
+    my $op;
+    my $op_id = $op_node->getAttribute('idref');
+    if ($op_id && ($op = $$self{a11y_arg_by_id}{$op_id})) {
+      $op = "#$op"; }
+    elsif (getQName($op_node) eq 'ltx:XMTok') {
+      $op = ($op_node && $op_node->getAttribute('meaning')) || '#op'; }
+    else {
+      $op = '(' . $self->build_semantic_attr($op_node, ($prefix ? ($prefix . "_op") : 'op')) . ')'; }
     my @arg_strings = ();
     my $index       = 0;
     for my $arg_node (@arg_nodes) {
       $index++;
-      if (getQName($arg_node) eq 'ltx:XMApp') {
-        push @arg_strings, dual_content_to_semantic_attr($arg_node, $prefix ? ($prefix . "_$index") : $index); }
+      my $arg_id     = $arg_node->getAttribute('idref');
+      my $arg_cached = $arg_id && $$self{a11y_arg_by_id}{$arg_id};
+      if ($arg_cached) {
+        push @arg_strings, "#$arg_cached"; }
       else {
-        push @arg_strings, '#' . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
+        push @arg_strings, $self->build_semantic_attr($arg_node, $prefix ? ($prefix . "_$index") : $index); } }
+# else {
+#   push @arg_strings, '#' . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
     return $op . '(' . join(",", @arg_strings) . ')'; }
   else {
     print STDERR "Warning:unknown XMDual content child '$name' will default data-semantic attribute to 'unknown'\n";
     return 'unknown'; } }
 
 # Given the first (content) child of an ltx:XMDual, and an idref value, compute the corresponding "arg" attribute for that XMRef
-sub dual_content_idref_to_data_attr {
+sub build_arg_attr {
   my ($content_node, $idref) = @_;
   my ($ref_node) = $LaTeXML::Post::DOCUMENT->findnodes(
     "descendant-or-self::ltx:XMRef[\@idref=\"" . $idref . "\"][1]", $content_node);

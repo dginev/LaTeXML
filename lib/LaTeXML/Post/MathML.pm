@@ -71,7 +71,8 @@ sub preprocess {
   # flip the accessibility switch on if requested, as it is currently experimental
   if (my $a11y = $doc->findnode('.//processing-instruction("latexml")[contains(.,"a11y=")]')) {
     if ($a11y->textContent =~ /a11y=['"]enabled['"]/) {
-      $$self{a11y} = 1; } }
+      $$self{a11y_arg_by_id} = {};
+      $$self{a11y}           = 1; } }
   return; }
 
 # Works for pmml, cmml

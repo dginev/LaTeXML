@@ -17,8 +17,14 @@ use LaTeXML::Package;
 
 RequirePackage('latexml');
 
-DefConstructorI(T_CS('\@request@math@a11y'), undef, "<?latexml a11y='enabled'?>");
-AtBeginDocument(T_CS('\@request@math@a11y'));
+our $a11y_annotations_enabled = 1;    # on by default
+DeclareOption('mark',   sub { $a11y_annotations_enabled = 1; return; });
+DeclareOption('nomark', sub { $a11y_annotations_enabled = 0; return; });
+ProcessOptions();
+
+if ($a11y_annotations_enabled) {
+  DefConstructorI(T_CS('\@request@math@a11y'), undef, "<?latexml a11y='enabled'?>");
+  AtBeginDocument(T_CS('\@request@math@a11y')); }
 
 # NOTE: demonstration-oriented binding, all names and definitions subject to change without notice.
 

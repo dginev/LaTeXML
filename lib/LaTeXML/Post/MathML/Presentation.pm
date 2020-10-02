@@ -131,9 +131,9 @@ sub addAccessibilityAnnotations {
     if ($op) {    # annotate only if we knew a 'meaning' attribute, for the special markup scenarios
       $meaning = "$op(" . join(",", map { "#$_" } 1 .. scalar(element_nodes($currentnode)) - 1) . ')'; }
     else {
-      # otherwise, take the liberty to delete all data-arg of direct children
+      # otherwise, take the liberty to delete all $A11Y_ARG_ATTR_NAME of direct children
       for my $pmml_child (@$node[2 .. scalar(@$node) - 1]) {
-        p_removeAttribute($pmml_child, 'data-arg'); } } }
+        p_removeAttribute($pmml_child, '$A11Y_ARG_ATTR_NAME'); } } }
 
 # 3. Bookkeep "arg" information
 # (careful, can be arbitrary deep in a dual content tree)
@@ -147,8 +147,8 @@ sub addAccessibilityAnnotations {
     my $position = $LaTeXML::Post::DOCUMENT->findvalue("count(preceding-sibling::*)", $currentnode);
     $arg = $position || 'op'; }
 
-  p_setAttribute($node, 'data-semantic', $meaning) if $meaning;
-  p_setAttribute($node, 'data-arg',      $arg)     if $arg;
+  p_setAttribute($node, $A11Y_NAME_ATTR_NAME, $meaning) if $meaning;
+  p_setAttribute($node, $A11Y_ARG_ATTR_NAME,  $arg)     if $arg;
   $$self{a11y_arg_by_id}{$source_id} = $arg if ($source_id && $arg);
   return; }
 
@@ -191,7 +191,7 @@ sub build_semantic_attr {
 #   push @arg_strings, '#' . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
     return $op . '(' . join(",", @arg_strings) . ')'; }
   else {
-    print STDERR "Warning:unknown XMDual content child '$name' will default data-semantic attribute to 'unknown'\n";
+    print STDERR "Warning:unknown XMDual content child '$name' will default $A11Y_NAME_ATTR_NAME attribute to 'unknown'\n";
     return 'unknown'; } }
 
 # Given the first (content) child of an ltx:XMDual, and an idref value, compute the corresponding "arg" attribute for that XMRef

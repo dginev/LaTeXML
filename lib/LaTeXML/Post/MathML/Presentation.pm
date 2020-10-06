@@ -90,6 +90,7 @@ sub associateNodeHook {
 # if the XMath source has a claim to the semantics via a "meaning" attribute.
 our $A11Y_ARG_ATTR_NAME  = 'arg';
 our $A11Y_NAME_ATTR_NAME = 'alt';
+our $A11Y_ARG_MARK       = '$';
 
 sub addAccessibilityAnnotations {
   my ($self, $node, $sourcenode, $currentnode) = @_;
@@ -126,9 +127,9 @@ sub addAccessibilityAnnotations {
   elsif ($current_node_name eq 'ltx:XMApp') {
 # Tricky, what is the best way to figure out if the operator is presentable vs implied? Check if it has _a11y=done?
     my $op_node = $currentnode->firstChild;
-    my $op      = $op_node->getAttribute('_a11y') ? '#op' : p_getAttribute($op_node, 'meaning');
+    my $op = $op_node->getAttribute('_a11y') ? $A11Y_ARG_MARK . 'op' : p_getAttribute($op_node, 'meaning');
     if ($op) {    # annotate only if we knew a 'meaning' attribute, for the special markup scenarios
-      $meaning = "$op(" . join(",", map { "#$_" } 1 .. scalar(element_nodes($currentnode)) - 1) . ')'; }
+      $meaning = "$op(" . join(",", map { $A11Y_ARG_MARK . $_ } 1 .. scalar(element_nodes($currentnode)) - 1) . ')'; }
     else {
       # otherwise, take the liberty to delete all $A11Y_ARG_ATTR_NAME of direct children
       for my $pmml_child (@$node[2 .. scalar(@$node) - 1]) {
@@ -162,7 +163,7 @@ sub build_semantic_attr {
     # iff the ref-ed node had a usable semantics, annotate
     if (my $id = $node->getAttribute('idref')) {
       if (my $arg = $$self{a11y_arg_by_id}{$id}) {
-        return "#$arg"; } }
+        return $A11Y_ARG_MARK . $arg; } }
     # if not set, not possible to annotate, so leave blank.
     return ''; }
   elsif ($name eq 'ltx:XMApp') {
@@ -171,9 +172,9 @@ sub build_semantic_attr {
     my $op;
     my $op_id = $op_node->getAttribute('idref');
     if ($op_id && ($op = $$self{a11y_arg_by_id}{$op_id})) {
-      $op = "#$op"; }
+      $op = $A11Y_ARG_MARK . $op; }
     elsif (getQName($op_node) eq 'ltx:XMTok') {
-      $op = ($op_node && $op_node->getAttribute('meaning')) || '#op'; }
+      $op = ($op_node && $op_node->getAttribute('meaning')) || $A11Y_ARG_MARK . 'op'; }
     else {
       $op = $self->build_semantic_attr($op_node, ($prefix ? ($prefix . "_op") : 'op')); }
     my @arg_strings = ();
@@ -183,11 +184,11 @@ sub build_semantic_attr {
       my $arg_id     = $arg_node->getAttribute('idref');
       my $arg_cached = $arg_id && $$self{a11y_arg_by_id}{$arg_id};
       if ($arg_cached) {
-        push @arg_strings, "#$arg_cached"; }
+        push @arg_strings, $A11Y_ARG_MARK . $arg_cached; }
       else {
         push @arg_strings, $self->build_semantic_attr($arg_node, $prefix ? ($prefix . "_$index") : $index); } }
 # else {
-#   push @arg_strings, '#' . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
+#   push @arg_strings, $A11Y_ARG_MARK . ($prefix ? ($prefix . "_$index") : $index); } } # will we need level suffixes?
     return $op . '(' . join(",", @arg_strings) . ')'; }
   else {
     print STDERR "Warning:unknown XMDual content child '$name' will default $A11Y_NAME_ATTR_NAME attribute to 'unknown'\n";

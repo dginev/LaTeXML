@@ -167,6 +167,7 @@ sub decodeFontname {
     $props{size} = $size;
     # Experimental Hack !?!?!?
     $props{encoding} = 'OT1' unless defined $props{encoding};
+    $props{at}       = $at . "pt" if defined $at;
     return %props; }
   else {
     return; } }
@@ -199,6 +200,7 @@ sub new {
   my $encoding  = $options{encoding};
   my $language  = $options{language};
   my $mathstyle = $options{mathstyle};
+
   if ($options{forcebold}) {    # for compatibility
     $series = 'bold'; $options{forceseries} = 1; }
   my $flags = 0
@@ -577,6 +579,7 @@ sub merge {
   my $encoding  = $options{encoding};
   my $language  = $options{language};
   my $mathstyle = $options{mathstyle};
+
   if ($options{forcebold}) {    # for compatibility
     $series = 'bold'; $options{forceseries} = 1; }
   my $flags = 0

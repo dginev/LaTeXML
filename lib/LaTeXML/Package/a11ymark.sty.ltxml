@@ -220,7 +220,11 @@ DefKeyVal('Declare', 'role',    '', '');
 DefKeyVal('Declare', 'meaning', '', '');
 DefKeyVal('Declare', 'action',  '', '');
 DefKeyVal('Declare', 'replace', '', '');
-our %PRAGMA_ROLES = map { $_ => 1 } qw(ID FUNCTION);
+our %PRAGMA_ROLES = map { $_ => 1 }
+  qw(ATOM UNKNOWN ID ARRAY NUMBER PUNCT PERIOD RELOP LANGLE RANGLE MIDBAR LBRACE RBRACE METARELOP MODIFIEROP MODIFIER ARROW ADDOP MULOP BINOP POSTFIX FUNCTION OPFUNCTION TRIGFUNCTION APPLYOP COMPOSEOP SUPOP OPEN SCRIPTOPEN CLOSE MIDDLE VERTBAR SINGLEVERTBAR BIGOP SUMOP INTOP LIMITOP DIFFOP OPERATOR POSTSUBSCRIPT POSTSUPERSCRIPT FLOATSUPERSCRIPT FLOATSUBSCRIPT);
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 DefMacro('\pragma OptionalMatch:* {}{}', sub { # Limitation: never use commas in the symbol/notation contents
     my ($gullet, $star, $properties, $notations) = @_;
     my @declarations       = ();

@@ -7,4 +7,4 @@ use LaTeXML::Util::Test;
 latexml_tests("t/structure",
   requires => {
     csquotes => 'csquotes.sty',
-    glossary => ['glossaries.sty','datatool-base.sty'] });
+    glossary => ['glossaries.sty','datatool-base.sty','mfirstuc.sty'] });

@@ -1,0 +1,134 @@
+package LaTeXML::Package::Pool;
+use strict;
+use warnings;
+use LaTeXML::Package;
+
+DefMacroI('\eqndemo', undef,
+  '\begin{equation}\@eqndemo@bindings\@@eqndemo'
+    . '\@equationgroup@numbering{numbered=1,preset=1,d eferretract=1,grouped=1,aligned=1}'
+    . '\@start@alignment',
+  locked => 1);
+DefMacroI('\endeqndemo', undef,
+  '\@finish@alignment\end@eqndemo\end{equation}',
+  locked => 1);
+
+DefPrimitive('\@eqndemo@bindings', sub {
+    my $col1 = { before => Tokens(T_CS('\hfil'), T_CS('\@hidden@bgroup'), T_CS('\displaystyle')),
+      after => Tokens(T_CS('\@hidden@egroup'),) };
+    my $col2 = { before => Tokens(T_CS('\hfil'), T_CS('\@hidden@bgroup'), T_CS('\displaystyle')),
+      after => Tokens(T_CS('\@hidden@egroup'), T_CS('\hfil')) };
+    my $col3 = { before => Tokens(T_CS('\@hidden@bgroup'), T_CS('\displaystyle')),
+      after => Tokens(T_CS('\@hidden@egroup'), T_CS('\hfil')) };
+
+    my %attributes = (
+      'class'  => 'ltx_eqn_eqndemo',
+      'colsep' => LookupDimension('\arraycolsep')->multiply(2));
+    my $cur_jot = LookupDimension('\jot');
+    if ($cur_jot && ($cur_jot->valueOf != LookupDimension('\lx@default@jot')->valueOf)) {
+      $attributes{rowsep} = $cur_jot; }
+
+    AssignValue(Alignment => LaTeXML::Core::Alignment->new(
+        template      => LaTeXML::Core::Alignment::Template->new(columns => [$col1, $col2, $col3]),
+        openContainer => sub { my %attr = RefStepID('@equationgroup');
+          $attr{'xml:id'} = $attr{id}; delete $attr{id};
+          $attr{class}    = 'ltx_eqn_eqndemo';
+          $_[0]->openElement('ltx:XMArray', %attr, @_[1 .. $#_]);
+        },
+        closeContainer => sub {
+          $_[0]->closeElement('ltx:XMArray'); },
+        openRow => sub {
+          my ($doc, %props) = @_;
+          $doc->openElement('ltx:XMRow', %props); },
+        closeRow    => sub { $_[0]->closeElement('ltx:XMRow'); },
+        openColumn  => sub { $_[0]->openElement('ltx:XMCell', @_[1 .. $#_]); },
+        closeColumn => sub { $_[0]->closeElement('ltx:XMCell'); },
+        properties  => { preserve_structure => 1, attributes => {%attributes} }));
+
+    Let(T_ALIGN,       '\@alignment@align');
+    Let("\\\\",        '\@alignment@newline');
+    Let('\cr',         '\@alignment@cr');
+    Let('\crcr',       '\@alignment@cr');
+    Let('\@open@row',  '\@equationgroup@open@row');
+    Let('\@close@row', '\@equationgroup@close@row');
+    return; });
+
+DefConstructor('\@@eqndemo SkipSpaces DigestedBody',
+  '#1',
+  beforeDigest   => sub { $_[0]->bgroup; },
+  afterConstruct => sub { rearrange__eqdemo($_[0], $_[0]->getNode->lastChild); }
+);
+DefPrimitiveI('\end@eqndemo', undef, sub { $_[0]->egroup; });
+
+sub rearrange__eqdemo {
+  my ($document, $equationgroup) = @_;
+  # Scan the "equations" (rows) within the $equationgroup
+  # to see what pattern of columns are present.
+  my @rows  = ();
+  my $array = $document->findnode('descendant-or-self::ltx:XMArray', $equationgroup);
+  foreach my $rownode ($document->findnodes('ltx:XMRow', $array)) {
+    my @cells = $document->findnodes('ltx:XMCell', $rownode);    # representing each column.
+    push(@rows, { node => $rownode, cols => [@cells],
+        L => ($cells[0] && $cells[0]->hasChildNodes),
+        M => ($cells[1] && $cells[1]->hasChildNodes),
+        R => ($cells[2] && $cells[2]->hasChildNodes),
+        numbered => ($document->findnode('ltx:tags', $rownode) ? 1 : 0),
+        labelled => $rownode->hasAttribute('label') }); }
+  my $nL = scalar(grep { $$_{L} } @rows);
+  my $nM = scalar(grep { $$_{M} } @rows);
+  my $nR = scalar(grep { $$_{R} } @rows);
+  # NOTE: Removed some surgury for pathological cases, like when only single column used.
+  # Remaining case is when all 3 columns are used.
+  my @eqs      = ();
+  my $numbered = 0;
+  my $oddness  = 0;
+  foreach my $row (@rows) {
+    my $class = 'unknown';
+    if ($$row{L}) {    # 1st column non-empty; Presumably a new "equation"
+      $class = 'new'; }
+    elsif ($$row{M}) {    # 1st is empty & 2nd non-empty (Rel?); Probably continues
+      if (!scalar(@eqs)) {    # But if no previous equation?
+        $class = 'odd'; }
+      elsif ($numbered && $$row{numbered}) {    # Separately numbered continuation?
+        $class = 'new'; }                       # Keep it as separate equation, even though missing LHS
+      else {
+        $class = 'continue'; } }                # Continues as multiequation
+    else {                                      # 1st & 2nd is empty
+      if (!scalar(@eqs)) {                      # But if no previous equation?
+        $class = 'odd'; }
+      elsif ($numbered && $$row{numbered}       # Separately numbered AND labeled?
+        && $$row{labelled}) {
+        $class = 'odd'; }                       # must keep separate, but weird!
+      else {
+        $class = 'continue'; } }                # Else, continues RHS.
+
+    if (($class eq 'new') || ($class eq 'odd')) {
+      $numbered = $$row{numbered};
+      push(@eqs, [@{ $$row{cols} }]);
+      $oddness++ if $class eq 'odd'; }
+    else {
+      $numbered |= $$row{numbered};
+      push(@{ $eqs[-1] }, @{ $$row{cols} }); }
+  }
+
+  Warn('unexpected', 'eqnarray', $equationgroup,
+    "Unrecognized equation patterns ($oddness) in eqnarray")
+    if (scalar(@rows) > 1) && $oddness;
+
+  # Now rearrange things appropriately.
+  my @seqns = ();
+  foreach my $eqset (@eqs) {    # For each apparent "equation"
+    my @seq = ();
+    foreach my $cell (@$eqset) {    # For each cell in the equation
+      foreach my $piece (element_nodes($cell)) {
+        GenerateID($document, $piece, undef, '');
+        push(@seq, ['ltx:XMRef', { idref => $piece->getAttribute('xml:id') }]); } }
+    push(@seqns, ['ltx:XMWrap', {}, @seq]); }
+  $document->replaceTree(['ltx:XMDual', {},
+      (scalar(@seqns) > 1
+        ? ['ltx:XMApp', {}, ['ltx:XMTok', { meaning => 'formulae' }], @seqns]
+        : $seqns[0]),
+      $array],
+    $array);
+  return; }
+
+1;

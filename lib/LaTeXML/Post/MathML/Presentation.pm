@@ -206,7 +206,15 @@ sub build_arg_attr {
     my $position = $LaTeXML::Post::DOCUMENT->findvalue("count(preceding-sibling::*)", $ancestor);
     $path     = $path ? ($position . '_' . $path) : $position;
     $ancestor = $ancestor->parentNode; }
-  return $path ? $path : (scalar(element_nodes($content_node)) > 1 ? 'op' : '1'); }
+  # TODO: Think this through... the underscores are gnarly.
+  # for now, switch them to numbers.
+  if ($path) {
+    my $count = 1 + ($content_node->getAttribute('_attr_count') || 0);
+    $content_node->setAttribute('_attr_count', $count);
+    return "$count";
+  } elsif (scalar(element_nodes($content_node)) > 1) {
+    return "op";
+} else { return '1'; } }
 
 #================================================================================
 # Presentation MathML with Line breaking

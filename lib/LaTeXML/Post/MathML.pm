@@ -1583,7 +1583,7 @@ DefMathML('Apply:?:formulae', sub {
   sub {
     my ($op, @elements) = @_;
     return ['m:apply', {},
-      ['m:csymbol', { cd => 'ambiguous' }, 'formulae-sequence'],
+      ['m:csymbol', { cd => 'ambiguous' }, 'formulae'],
       map { cmml($_) } @elements];
   });
 

@@ -16,6 +16,7 @@ use warnings;
 use LaTeXML::Package;
 
 RequirePackage('latexml');
+RequirePackage('a11yeqn');
 
 our $a11y_annotations_enabled = 1;    # on by default
 DeclareOption('mark',   sub { $a11y_annotations_enabled = 1; return; });
@@ -205,6 +206,11 @@ DefMacro('\fnderive{}{}', '\fnderive@build{#1}{\derivemark{#2}}');
 DefMath('\fnderive@build{}{}', '#1^#2',
   meaning                => 'derivative-implicit-variable',
   hide_content_reversion => 1);
+
+# piecewise functions
+DefMath('\defeq{}{}', '#1=#2', meaning => 'defined-as',
+  hide_content_reversion => 1);
+DefMacro('\lx@case@if{}{}', '\lx@apply{\lx@symbol{when} #1 #2}');
 
 ## Circumfix, applicative:
 DefMath('\norm{}', '|\mathbf{#1}|', meaning => 'norm', role => 'ID',

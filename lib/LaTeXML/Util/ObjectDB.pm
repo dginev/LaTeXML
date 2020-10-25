@@ -188,4 +188,76 @@ sub unregister {
   return; }
 
 #======================================================================
+use Data::Dump::Streamer;
+# Ensure subroutines that will be hosted by State can be frozen and thawed
+sub freezable_any {
+  my @freezable = ();
+  for my $data (@_) {
+    my $dref = ref $data;
+    if (not($dref) or $dref eq 'Regexp' or $dref =~ /^LaTeXML::Common/ or $dref =~ /(Glue|Rewrite|Regexp)$/) {
+      push(@freezable, $data); }
+    elsif ($dref eq 'ARRAY' or $dref =~ /^LaTeXML::Core::Token/ or $dref =~ /Parameters$/) {
+      my $idx = 0;
+      for my $val (@$data) {
+        $$data[$idx] = freezable_any($val) if ref $val;
+        $idx++; }
+      push(@freezable, $data); }
+    elsif ($dref eq 'CODE') {
+      push(@freezable, freezable_code($data)); }
+    else {    # hash case is the default
+      while (my ($key, $val) = each %$data) {
+        $$data{$key} = freezable_any($val) if ref $val; }
+      push(@freezable, $data); } }
+  return wantarray ? @freezable : $freezable[0]; }
+
+sub freezable_code {
+  my ($subref) = @_;
+  return $subref if (ref $subref ne 'CODE');
+  my $orig_body = Dump($subref)->Indent(0)->Out();
+  my $body      = $orig_body;
+  # print STDERR "\n\n\n\n original body: $orig_body\n\n\n\n" if $body=~/do_def/m;
+  my $has_nested_sub = ($body =~ s/^\s*\$CODE1=sub\s*\{(?:.+)sub\s*\{//m);
+  $body =~ s/^\s*\$CODE1=sub \{\s*//m;
+  $body =~ s/\};\s*$//;
+  # print STDERR "body 1 expansion: \n\n$body\n\n";
+
+  # Twice for "good luck" -- correctly fixes 1-level nested subroutines.
+  # TODO: In general we'd need to loop for as many nested cases as we have...
+  # in practice, latexml uses 2 levels at most.
+  my $newref;
+  if ($has_nested_sub) {
+    $newref = eval "{$body}";
+    print STDERR "to_freezable eval 1 error: $@\n$orig_body\n" if $@;
+    $body = Dump($newref)->Indent(0)->Out();
+    $body =~ s/\$CODE1=//g;    # leave the anonymous subroutines anonymous
+                               # print STDERR "body 2 expansion: \n\n$body\n\n";
+  }
+  $newref = eval "sub { $body }";
+  print STDERR "to_freezable eval 2 error: $@\noriginal:\n $orig_body\nfinal:\n $body\n" if $@;
+  return $newref; }
+
+sub cache_state {
+  my ($state, $basename) = @_;
+  my $filename = "$basename.state.cache";
+# we need to make all CODE routines serializable, and this is both slow and ad-hoc. We basically need a deep copy to get anywhere...
+  $state = freezable_any($state);
+  local $Storable::Eval    = 1;
+  local $Storable::Deparse = 1;
+  open(my $state_fh, '>', $filename);
+  Storable::nstore_fd($state, $state_fh);
+  close $state_fh;
+  return; }
+
+sub load_state {
+  my ($basename) = @_;
+  return unless $basename;
+  my $filename = "$basename.state.cache";
+  if (-f $filename) {
+    local $Storable::Deparse = 1;
+    local $Storable::Eval    = 1;
+    return Storable::retrieve($filename); }
+  else {
+    return; } }
+
+#======================================================================
 1;

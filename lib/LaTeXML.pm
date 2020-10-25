@@ -85,7 +85,10 @@ sub prepare_session {
   $$self{opts} = $opts;
 
   #3. If there is something to do, initialize a session:
-  $self->initialize_session if ($something_to_do || (!$$self{ready}));
+  if ($something_to_do || (!$$self{ready})) {
+    $self->initialize_session;
+    # 4. If we had a cache_key, store a cached state
+    LaTeXML::Util::ObjectDB::cache_state($$self{latexml}{state}, $$opts{'cache_key'}) if ($$opts{'cache_key'}); }
 
   return;
 }
@@ -94,10 +97,6 @@ sub initialize_session {
   my ($self) = @_;
   $$self{runtime} = {};
   $self->bind_log;
-  # Empty the package namespace
-  foreach my $subname (keys %LaTeXML::Package::Pool::) {
-    delete $LaTeXML::Package::Pool::{$subname};
-  }
 
   my $latexml;
   my $init_eval_return = eval {
@@ -668,10 +667,18 @@ sub new_latexml {
   if (my @baddirs = grep { !-d $_ } @{ $$opts{paths} }) {
     warn "\n$LaTeXML::IDENTITY : these path directories do not exist: " . join(', ', @baddirs) . "\n"; }
 
-  $latexml->withState(sub {
-      my ($state) = @_;
-      $latexml->initializeState('TeX.pool', @{ $$latexml{preload} || [] });
-  });
+  if (my $state = LaTeXML::Util::ObjectDB::load_state($$opts{'cache_key'})) {
+    $$latexml{state} = $state;
+  } else {
+    # Empty the package namespace, then reinitialize
+    foreach my $subname (keys %LaTeXML::Package::Pool::) {
+      delete $LaTeXML::Package::Pool::{$subname};
+    }
+    $latexml->withState(sub {
+        my ($state) = @_;
+        $latexml->initializeState('TeX.pool', @{ $$latexml{preload} || [] });
+    });
+  }
 
   # TODO: Do again, need to do this in a GOOD way as well:
   $latexml->digestFile($_, noinitialize => 1) foreach (@str_pre);

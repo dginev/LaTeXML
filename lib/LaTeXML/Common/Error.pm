@@ -64,7 +64,7 @@ sub Fatal {
 
   # We'll assume that if the DIE handler is bound (presumably to this function)
   # we're in the outermost call to Fatal; we'll clear the handler so that we don't nest calls.
-  die $message if $LaTeXML::IGNORE_ERRORS    # Short circuit, w/no formatting, if in probing eval
+  die $message if $LaTeXML::IGNORE_ERRORS        # Short circuit, w/no formatting, if in probing eval
     || (($SIG{__DIE__} eq 'DEFAULT') && $^S);    # Also missing class when parsing bindings(?!?!)
 
   # print STDERR "\nHANDLING FATAL:"
@@ -157,22 +157,22 @@ sub Info {
 # Progress reporting.
 
 sub NoteProgress {
-  my (@stuff) = @_;
-  my $state = $STATE;
+  my (@stuff)   = @_;
+  my $state     = $STATE;
   my $verbosity = $state && $state->lookupValue('VERBOSITY') || 0;
   print STDERR @stuff if $verbosity >= 0;
   return; }
 
 sub NoteProgressDetailed {
-  my (@stuff) = @_;
-  my $state = $STATE;
+  my (@stuff)   = @_;
+  my $state     = $STATE;
   my $verbosity = $state && $state->lookupValue('VERBOSITY') || 0;
   print STDERR @stuff if $verbosity >= 1;
   return; }
 
 sub NoteBegin {
-  my ($stage) = @_;
-  my $state = $STATE;
+  my ($stage)   = @_;
+  my $state     = $STATE;
   my $verbosity = $state && $state->lookupValue('VERBOSITY') || 0;
   if ($state && ($verbosity >= 0)) {
     $state->assignMapping('NOTE_TIMERS', $stage, [Time::HiRes::gettimeofday]);
@@ -180,8 +180,8 @@ sub NoteBegin {
   return; }
 
 sub NoteEnd {
-  my ($stage) = @_;
-  my $state = $STATE;
+  my ($stage)   = @_;
+  my $state     = $STATE;
   my $verbosity = $state && $state->lookupValue('VERBOSITY') || 0;
   if (my $start = $state && $state->lookupMapping('NOTE_TIMERS', $stage)) {
     $state->assignMapping('NOTE_TIMERS', $stage, undef);
@@ -325,7 +325,7 @@ sub generateMessage {
 
   # FIRST line of stack trace information ought to look at the $where
   my $wheretype = ref $where;
-  if ($detail <= 0) { }    # No extra context
+  if ($detail <= 0) { }                    # No extra context
   elsif ($wheretype =~ /^XML::LibXML/) {
     push(@lines, "Node is " . Stringify($where)); }
   ## Hmm... if we're being verbose or level is high, we might do this:
@@ -383,8 +383,8 @@ sub getLocation {
   my ($where) = @_;
   my $wheretype = ref $where;
   if ($wheretype && ($wheretype =~ /^XML::LibXML/)) {
-    my $box = $LaTeXML::DOCUMENT && $LaTeXML::DOCUMENT->getNodeBox($where);
-    return Locator($box) if $box; }
+    if (my $box = $LaTeXML::DOCUMENT && $LaTeXML::DOCUMENT->getNodeBox($where)) {
+      return Locator($box) if $box; } }
   elsif ($wheretype && $where->can('getLocator')) {
     return $where->getLocator; }
   elsif (defined $where) {

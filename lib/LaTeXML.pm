@@ -86,9 +86,7 @@ sub prepare_session {
 
   #3. If there is something to do, initialize a session:
   if ($something_to_do || (!$$self{ready})) {
-    $self->initialize_session;
-    # 4. If we had a cache_key, store a cached state
-    LaTeXML::Util::ObjectDB::cache_state($$self{latexml}{state}, $$opts{'cache_key'}) if ($$opts{'cache_key'}); }
+    $self->initialize_session; }
 
   return;
 }
@@ -678,7 +676,8 @@ sub new_latexml {
         my ($state) = @_;
         $latexml->initializeState('TeX.pool', @{ $$latexml{preload} || [] });
     });
-  }
+    # 4. If we had a cache_key, cache the newly initialized state
+    LaTeXML::Util::ObjectDB::cache_state($$latexml{state}, $$opts{'cache_key'}) if $$opts{'cache_key'}; }
 
   # TODO: Do again, need to do this in a GOOD way as well:
   $latexml->digestFile($_, noinitialize => 1) foreach (@str_pre);

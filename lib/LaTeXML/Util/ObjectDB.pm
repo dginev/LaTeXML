@@ -189,6 +189,7 @@ sub unregister {
 
 #======================================================================
 use Data::Dump::Streamer;
+use Sub::Identify ':all';
 # Ensure subroutines that will be hosted by State can be frozen and thawed
 sub freezable_any {
   my @freezable = ();
@@ -215,7 +216,8 @@ sub freezable_code {
   return $subref if (ref $subref ne 'CODE');
   my $orig_body = Dump($subref)->Indent(0)->Out();
   my $body      = $orig_body;
-  # print STDERR "\n\n\n\n original body: $orig_body\n\n\n\n" if $body=~/do_def/m;
+  return if ($body =~ /^\s*\$CODE1=\\&/);    # skippable case (e.g. "our" variable)
+      # print STDERR "\n\n\n\n original body: $orig_body\n\n\n\n" if $body=~/do_def/m;
   my $has_nested_sub = ($body =~ s/^\s*\$CODE1=sub\s*\{(?:.+)sub\s*\{//m);
   $body =~ s/^\s*\$CODE1=sub \{\s*//m;
   $body =~ s/\};\s*$//;
@@ -238,24 +240,67 @@ sub freezable_code {
 
 sub cache_state {
   my ($state, $basename) = @_;
-  my $filename = "$basename.state.cache";
-# we need to make all CODE routines serializable, and this is both slow and ad-hoc. We basically need a deep copy to get anywhere...
-  $state = freezable_any($state);
-  local $Storable::Eval    = 1;
-  local $Storable::Deparse = 1;
-  open(my $state_fh, '>', $filename);
-  Storable::nstore_fd($state, $state_fh);
-  close $state_fh;
-  return; }
+# Why fork? Because carelessly calling freezable_code on a State, and then using that same State object,
+# leads to tricky bugs... best to cache in a sandbox and avoid any weirdness - handle that when loading.
+  if (my $pid = fork()) {
+    waitpid($pid, 0);
+    return;
+  } else {
+    local $Storable::Eval    = 1;
+    local $Storable::Deparse = 1;
+
+    # First, cache the Package::Pool namespace routines:
+    my $pool_filename = "$basename.pool.cache";
+    print STDERR "\n--- Caching Pool to $pool_filename...";
+    my $pool = {};
+    foreach my $subname (sort keys %LaTeXML::Package::Pool::) {
+      next unless $subname =~ /^[a-z]/ or $subname eq 'DefAccent';
+      my $coderef    = eval "\\\&LaTeXML::Package::Pool::$subname";
+      my $stash_name = stash_name($coderef);
+      if ($stash_name ne 'LaTeXML::Package::Pool') {
+        # print STDERR "foreign $subname from $stash_name\n";
+        next; }
+      my $freezable = freezable_code($coderef);
+      if ($freezable) {
+        $$pool{$subname} = $freezable;
+      } else {
+        print STDERR "can't use code for $subname\n";
+    } }
+    open(my $pool_fh, '>', $pool_filename);
+    Storable::nstore_fd($pool, $pool_fh);
+    close $pool_fh;
+    print STDERR " ...completed.\n";
+
+    my $state_filename = "$basename.state.cache";
+    print STDERR "\n--- Caching State to $state_filename...";
+    $state = freezable_any($state);
+    open(my $state_fh, '>', $state_filename);
+    Storable::nstore_fd($state, $state_fh);
+    close $state_fh;
+    print STDERR " ...completed.\n";
+    exit 0;
+} }
 
 sub load_state {
   my ($basename) = @_;
   return unless $basename;
-  my $filename = "$basename.state.cache";
-  if (-f $filename) {
+  my $state_filename = "$basename.state.cache";
+  my $pool_filename  = "$basename.pool.cache";
+  if (-f $pool_filename && -f $state_filename) {
     local $Storable::Deparse = 1;
     local $Storable::Eval    = 1;
-    return Storable::retrieve($filename); }
+    print STDERR "\n--- Loading Pool from $pool_filename... ";
+    my $pool = Storable::retrieve($pool_filename);
+    for my $key (sort(keys %$pool)) {
+      my $coderef = $$pool{$key};
+      no strict 'refs';
+      my $subname = "LaTeXML::Package::Pool::$key";
+      *$subname = $coderef; }
+    print STDERR " ...completed.\n";
+    print STDERR "\n--- Loading State from $state_filename... ";
+    my $state = Storable::retrieve($state_filename);
+    print STDERR " ...completed.\n";
+    return $state; }
   else {
     return; } }
 

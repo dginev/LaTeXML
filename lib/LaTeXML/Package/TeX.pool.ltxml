@@ -1823,7 +1823,6 @@ DefConstructor('\mathaccent Number Digested',
 DefPrimitive('\setbox Number SkipMatch:=', sub {
     my ($stomach) = @_;
     no warnings 'recursion';
-    my $box = 'box' . $_[1]->valueOf;
     # If there is any afterAssignment tokens, move them over so BoxContents parameter will use them
     if (my $token = LookupValue('afterAssignment')) {
       AssignValue('afterAssignment' => undef, 'global');
@@ -1837,14 +1836,14 @@ DefPrimitive('\setbox Number SkipMatch:=', sub {
     @rest; });
 
 DefPrimitive('\box Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
-    AssignValue($box, undef);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
+    AssignValue("box$id", undef);
     ($stuff ? $stuff->unlist : ()); });
 
 DefPrimitive('\copy Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
     ($stuff ? $stuff->unlist : ()); });
 
 sub revert_spec {
@@ -2376,13 +2375,13 @@ DefConstructor('\moveright Dimension MoveableBox',
 
 # \unvbox<8bit>, \unvcopy<8bit>
 DefPrimitive('\unvbox Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
-    AssignValue($box, undef);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
+    AssignValue("box$id", undef);
     (defined $stuff ? $stuff->unlist : ()); });
 DefPrimitive('\unvcopy Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
     (defined $stuff ? $stuff->unlist : ()); });
 
 #======================================================================
@@ -3241,13 +3240,13 @@ DefConstructor('\raise Dimension MoveableBox',
 
 # \unhbox<8bit>, \unhcopy<8bit>
 DefPrimitive('\unhbox Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
-    AssignValue($box, undef);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
+    AssignValue("box$id", undef);
     (defined $stuff ? $stuff->unlist : ()); });
 DefPrimitive('\unhcopy Number', sub {
-    my $box   = 'box' . $_[1]->valueOf;
-    my $stuff = LookupValue($box);
+    my $id    = $_[1]->valueOf;
+    my $stuff = LookupValue("box$id");
     (defined $stuff ? $stuff->unlist : ()); });
 
 # Implement ???
@@ -4426,11 +4425,11 @@ DefRegister('\allocationnumber' => Number(0));
 
 DefPrimitive('\alloc@@ {}', sub {
     my ($stomach, $type) = @_;
-    my $c = 'allocation @' . ToString($type);
-    my $n = LookupValue($c) || '0';
+    $type = ToString($type);
+    my $n = LookupValue("allocation \@$type") || '0';
     $n = $n->valueOf if ref $n;
-    AssignValue($c                  => $n + 1,     'global');
-    AssignValue('\allocationnumber' => Number($n), 'global'); });
+    AssignValue("allocation \@$type" => $n + 1,     'global');
+    AssignValue('\allocationnumber'  => Number($n), 'global'); });
 DefMacro('\newread Token',     '\alloc@@{read}\global\chardef#1=\allocationnumber');
 DefMacro('\newwrite Token',    '\alloc@@{write}\global\chardef#1=\allocationnumber');
 DefMacro('\newfam Token',      '\alloc@@{fam}\global\chardef#1=\allocationnumber');

@@ -133,7 +133,7 @@ sub addAccessibilityAnnotations {
     else {
       # otherwise, take the liberty to delete all $A11Y_ARG_ATTR_NAME of direct children
       for my $pmml_child (@$node[2 .. scalar(@$node) - 1]) {
-        p_removeAttribute($pmml_child, '$A11Y_ARG_ATTR_NAME'); } } }
+        p_removeAttribute($pmml_child, $A11Y_ARG_ATTR_NAME); } } }
 
 # 3. Bookkeep "arg" information
 # (careful, can be arbitrary deep in a dual content tree)

@@ -883,7 +883,7 @@ sub siteRelativeDestination {
   my ($self) = @_;
   return (defined $$self{destination}
     ? pathname_relative($$self{destination}, $$self{siteDirectory})
-    : undef); }
+    : ''); }
 
 sub getParentDocument {
   my ($self) = @_;

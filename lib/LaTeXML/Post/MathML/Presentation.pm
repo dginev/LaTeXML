@@ -89,7 +89,7 @@ sub associateNodeHook {
 # Experiment: set accessibility attributes on the resulting presentation tree,
 # if the XMath source has a claim to the semantics via a "meaning" attribute.
 our $A11Y_ARG_ATTR_NAME  = 'arg';
-our $A11Y_NAME_ATTR_NAME = 'alt';
+our $A11Y_NAME_ATTR_NAME = 'intent';
 our $A11Y_ARG_MARK       = '$';
 
 sub addAccessibilityAnnotations {

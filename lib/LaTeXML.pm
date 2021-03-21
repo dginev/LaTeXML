@@ -214,71 +214,84 @@ sub convert {
     removeMathFormat($opts, 'svg');
     maybeAddMathFormat($opts, 'pmml'); }
 
-  # 1.5 Prepare a daemon frame
-  my $latexml = $$self{latexml};
-  $latexml->withState(sub {
-      my ($state) = @_;    # Sandbox state
-      $$state{status} = {};
-      $state->pushDaemonFrame;
-      $state->assignValue('_authlist',      $$opts{authlist}, 'global');
-      $state->assignValue('REMOTE_REQUEST', (!$$opts{local}), 'global');
-  });
+  my ($dom, $serialized, $eval_report) = (undef, undef, undef);
+  if ($$opts{type} eq 'XML') {
+    eval { $dom = LaTeXML::Common::XML::Parser->new()->parseFile($source); };
+    if (!$dom) {
+      local $@ = 'Fatal:conversion:unknown XML Parsing failed! (Unknown Reason)' if (!$@);
+      $eval_report           = $@;
+      $$runtime{status}      = colorizeString('XML parsing failed', 'error');
+      $$runtime{status_code} = 3; }
+    else {
+      $$runtime{status}      = colorizeString('No obvious problems', 'success');
+      $$runtime{status_code} = 0; } }
+  else {
+    # 1.5 Prepare a daemon frame
+    my $latexml = $$self{latexml};
+    $latexml->withState(sub {
+        my ($state) = @_;    # Sandbox state
+        $$state{status} = {};
+        $state->pushDaemonFrame;
+        $state->assignValue('_authlist',      $$opts{authlist}, 'global');
+        $state->assignValue('REMOTE_REQUEST', (!$$opts{local}), 'global');
+    });
 
-  # 2 Beginning Core conversion - digest the source:
-  my ($digested, $dom, $serialized) = (undef, undef, undef);
-  my $convert_eval_return = eval {
-    # Should be this, but is overridden by withState.
-    #local $SIG{'ALRM'} = sub { LaTeXML::Common::Error::Fatal('conversion','timeout',
-    # "Conversion timed out after " . $$opts{timeout} . " seconds!\n"); };
-    alarm($$opts{timeout});
-    my $mode = ($$opts{type} eq 'auto') ? 'TeX' : $$opts{type};
-    $digested = $latexml->digestFile($source, preamble => $current_preamble,
-      postamble    => $current_postamble,
-      mode         => $mode,
-      noinitialize => 1);
-    # 2.1 Now, convert to DOM and output, if desired.
-    if ($digested) {
-      $latexml->withState(sub {
-          if ($$opts{format} eq 'tex') {
-            $serialized = LaTeXML::Core::Token::UnTeX($digested);
-          } elsif ($$opts{format} eq 'box') {
-            $serialized = ($$opts{verbosity} > 0 ? $digested->stringify : $digested->toString);
-          } else {    # Default is XML
-            $dom = $latexml->convertDocument($digested);
-          }
-      }); }
-    alarm(0);
-    1;
-  };
-  # 2.2 Bookkeeping in case fatal errors occurred
-  ### Note: this cause double counting if LaTeXML has already handled it.
-  ### But leaving it might might miss errors that sneak through (can that happen?)
-  ####  $$latexml{state}->noteStatus('fatal') if $latexml && $@;    # Fatal Error?
-  local $@ = 'Fatal:conversion:unknown TeX to XML conversion failed! (Unknown Reason)' if ((!$convert_eval_return) && (!$@));
-  my $eval_report = $@;
-  $$runtime{status}      = $latexml->getStatusMessage;
-  $$runtime{status_code} = $latexml->getStatusCode;
+    # 2 Beginning Core conversion - digest the source:
+    my $digested            = undef;
+    my $convert_eval_return = eval {
+      # Should be this, but is overridden by withState.
+      #local $SIG{'ALRM'} = sub { LaTeXML::Common::Error::Fatal('conversion','timeout',
+      # "Conversion timed out after " . $$opts{timeout} . " seconds!\n"); };
+      alarm($$opts{timeout});
+      my $mode = ($$opts{type} eq 'auto') ? 'TeX' : $$opts{type};
+      $digested = $latexml->digestFile($source, preamble => $current_preamble,
+        postamble    => $current_postamble,
+        mode         => $mode,
+        noinitialize => 1);
+      # 2.1 Now, convert to DOM and output, if desired.
+      if ($digested) {
+        $latexml->withState(sub {
+            if ($$opts{format} eq 'tex') {
+              $serialized = LaTeXML::Core::Token::UnTeX($digested);
+            } elsif ($$opts{format} eq 'box') {
+              $serialized = ($$opts{verbosity} > 0 ? $digested->stringify : $digested->toString);
+            } else {    # Default is XML
+              $dom = $latexml->convertDocument($digested);
+            }
+        }); }
+      alarm(0);
+      1;
+    };
+    # 2.2 Bookkeeping in case fatal errors occurred
+    ### Note: this cause double counting if LaTeXML has already handled it.
+    ### But leaving it might might miss errors that sneak through (can that happen?)
+    ####  $$latexml{state}->noteStatus('fatal') if $latexml && $@;    # Fatal Error?
+    local $@ = 'Fatal:conversion:unknown TeX to XML conversion failed! (Unknown Reason)' if ((!$convert_eval_return) && (!$@));
+    $eval_report           = $@;
+    $$runtime{status}      = $latexml->getStatusMessage;
+    $$runtime{status_code} = $latexml->getStatusCode;
 
-  # End daemon run, by popping frame:
-  $latexml->withState(sub {
-      my ($state) = @_;    # Remove current state frame
-      ## TODO: This section of option preparations can be factored out as a subroutine if it grows further
-      ##       the general idea is that right before the "pop" of the daemon frame, we have access to all meaningful
-      ##       global state values, and we can preserve the relevant ones for the post-processing stage
-      ## BEGIN POST-PROCESSING-PREP
-      $$opts{searchpaths} = $state->lookupValue('SEARCHPATHS'); # save the searchpaths for post-processing
-      if ($state->lookupValue('LEXEMATIZE_MATH')) {  # save potential request for serializing math lexemes
-        $$opts{math_formats} ||= [];
-        push @{ $$opts{math_formats} }, 'lexemes';
-        # recheck need for parallel
-        $$opts{parallelmath} = 1 if (@{ $$opts{math_formats} } > 1); }
-      ## END POST-PROCESSING-PREP
-      $state->popDaemonFrame;
-  });
-  if ($LaTeXML::UNSAFE_FATAL) {
-    # If the conversion hit an unsafe fatal, we need to reinitialize
-    $LaTeXML::UNSAFE_FATAL = 0;
-    $$self{ready} = 0;
+    # End daemon run, by popping frame:
+    $latexml->withState(sub {
+        my ($state) = @_;    # Remove current state frame
+        ## TODO: This section of option preparations can be factored out as a subroutine if it grows further
+        ##       the general idea is that right before the "pop" of the daemon frame, we have access to all meaningful
+        ##       global state values, and we can preserve the relevant ones for the post-processing stage
+        ## BEGIN POST-PROCESSING-PREP
+        $$opts{searchpaths} = $state->lookupValue('SEARCHPATHS'); # save the searchpaths for post-processing
+        if ($state->lookupValue('LEXEMATIZE_MATH')) {  # save potential request for serializing math lexemes
+          $$opts{math_formats} ||= [];
+          push @{ $$opts{math_formats} }, 'lexemes';
+          # recheck need for parallel
+          $$opts{parallelmath} = 1 if (@{ $$opts{math_formats} } > 1); }
+        ## END POST-PROCESSING-PREP
+        $state->popDaemonFrame;
+    });
+    if ($LaTeXML::UNSAFE_FATAL) {
+      # If the conversion hit an unsafe fatal, we need to reinitialize
+      $LaTeXML::UNSAFE_FATAL = 0;
+      $$self{ready} = 0;
+    }
   }
   if ($eval_report || ($$runtime{status_code} == 3)) {
     # Terminate immediately on Fatal errors
@@ -443,6 +456,10 @@ sub convert_post {
 
   my $DOCUMENT = LaTeXML::Post::Document->new($dom, %PostOPS);
   my @procs    = ();
+
+  if ($$opts{type} eq 'XML' && $$opts{validate}) {
+    $DOCUMENT->validate; }
+
   #TODO: Add support for the following:
   my $dbfile = $$opts{dbfile};
   if (defined $dbfile && !-f $dbfile) {

@@ -215,17 +215,10 @@ sub convert {
     maybeAddMathFormat($opts, 'pmml'); }
 
   my ($dom, $serialized, $eval_report) = (undef, undef, undef);
-  if ($$opts{type} eq 'XML') {
-    eval { $dom = LaTeXML::Common::XML::Parser->new()->parseFile($source); };
-    if (!$dom) {
-      local $@ = 'Fatal:conversion:unknown XML Parsing failed! (Unknown Reason)' if (!$@);
-      $eval_report           = $@;
-      $$runtime{status}      = colorizeString('XML parsing failed', 'error');
-      $$runtime{status_code} = 3; }
-    else {
-      $$runtime{status}      = colorizeString('No obvious problems', 'success');
-      $$runtime{status_code} = 0; } }
-  else {
+  # If the type is XML, we can skip core processing,
+  # and directly get ready for post-processing
+  if ($$opts{type} ne 'xml') {
+    $self->convert_core();
     # 1.5 Prepare a daemon frame
     my $latexml = $$self{latexml};
     $latexml->withState(sub {
@@ -429,7 +422,7 @@ sub get_converter {
 ####       Helper routines            #####
 ###########################################
 sub convert_post {
-  my ($self, $dom) = @_;
+  my ($self, $core_doc) = @_;
   my $opts    = $$self{opts};
   my $runtime = $$self{runtime};
   my ($xslt, $parallel, $math_formats, $format, $verbosity, $defaultresources, $embed) =
@@ -454,10 +447,16 @@ sub convert_post {
   #Postprocess
   $parallel = $parallel || 0;
 
-  my $DOCUMENT = LaTeXML::Post::Document->new($dom, %PostOPS);
-  my @procs    = ();
+  my $DOCUMENT;
+  if (ref $core_doc) {
+    $DOCUMENT = LaTeXML::Post::Document->new($core_doc, %PostOPS); }
+  elsif ($core_doc =~ s/^literal://) {
+    $DOCUMENT = LaTeXML::Post::Document->newFromString($core_doc, %PostOPS); }
+  else {
+    $DOCUMENT = LaTeXML::Post::Document->newFromFile($core_doc, %PostOPS); }
+  my @procs = ();
 
-  if ($$opts{type} eq 'XML' && $$opts{validate}) {
+  if ($$opts{type} eq 'xml' && $$opts{validate}) {
     $DOCUMENT->validate; }
 
   #TODO: Add support for the following:
@@ -820,10 +819,15 @@ Sets the "ready" flag to true, making a subsequent "convert" call immediately po
 
 Creates a new LaTeXML object and initializes its state.
 
-=item C<< my $postdoc = $converter->convert_post($dom); >>
+=item C<< my $postdoc = $converter->convert_post($core_doc); >>
 
-Post-processes a LaTeXML::Core::Document object $dom into a final format,
-               based on the preferences specified in $$self{opts}.
+Post-processes a LaTeXML::Core::Document object,
+  OR a literal XML strings in LaTeXML's schema,
+  OR a file.xml filepath pointing to the result of LaTeXML's Core processing.
+   
+Transforms to a final format, with customizable feature processors related to
+  backmatter and sidematter, mathematics, web layout and packaging,
+  available in $$converter{opts}.
 
 Typically used only internally by C<convert>.
 

@@ -31,11 +31,11 @@ my ($show, $internal, $cumulative, $basepkgs) = ('diff', undef, undef, undef);
 my $do_all      = 0;
 my @searchpaths = ();
 GetOptions("tex" => sub { $show = 'tex'; },
-  "latexml"   => sub { $show = 'latexml'; },
-  "diff"      => sub { $show = 'diff'; },
-  "signature" => sub { $show = 'signature'; },
-  "stub"      => sub { $show = 'stub'; },
-  "internal!" => \$internal,
+  "latexml"     => sub { $show = 'latexml'; },
+  "diff"        => sub { $show = 'diff'; },
+  "signature"   => sub { $show = 'signature'; },
+  "stub"        => sub { $show = 'stub'; },
+  "internal!"   => \$internal,
   "cumulative!" => \$cumulative,
   "amstex!"     => \$::AMSTEX,
   "help"        => \$help,
@@ -155,14 +155,14 @@ sub newInternal {
   $name .= '.' . $type if $type;
   $name = "latex.ltx" if $name eq "LaTeX.pool";
   $name = "plain.tex" if $name eq "TeX.pool";
-  $dir = '.' unless $dir;
+  $dir  = '.' unless $dir;
 
   if (my $cached = $CACHE{$class}{$name}) {
     return $cached; }
 
   my @paths = ();
   push(@paths, $dir);
-  push(@paths, @{ $options{searchpaths} }) if $options{searchpaths};
+  push(@paths, @{ $options{searchpaths} })      if $options{searchpaths};
   push(@paths, @{ $$classorself{searchpaths} }) if ref $classorself;
 
   my $self = bless { name => $name, %options, symbols => {}, includes => {}, searchpaths => [@paths] }, $class;
@@ -405,7 +405,7 @@ sub noteInclusion {
   my ($dir, $name, $type) = pathname_split($file);
   $type = $defaulttype unless $type;
   $name .= '.' . $type if $type;
-  return if $name eq $$self{name};
+  return               if $name eq $$self{name};
   $name =~ s/1?\\\@ptsize/10/;
   if ($name =~ /^([^\\]*)\\([a-zA-Z\@]+)([^\\]*)$/) {    # Ugh...
     $$self{rescanfor}{$2} = [$1, $3]; }
@@ -445,13 +445,13 @@ sub generateStub {
   open($STUB_FH, '>', $dest) or die "Couldn't open '$dest' for writing: $!";
 
   my %inc  = %{ $$self{includes} };
-  my @base = split(/,/, $base);
+  my @base = $base ? split(/,/, $base) : ();
   my %base = ($base ? map { ($_ => 1) } @base : ());
 
   $self->removeBase;
   $self->removeInternal unless $internal;
 
-  my $header = $STUB_HEADER;
+  my $header     = $STUB_HEADER;
   my $headername = $$self{name} . (' ' x (68 - length($$self{name}))) . "| #";
   $header =~ s/BINDINGNAME/$headername/;
   print $STUB_FH $header;
@@ -476,7 +476,7 @@ sub generateStub {
     my $package = $self->new($pkg);
     $package->removeBase;    #?
     $self->subtract($package);
-    my $p = $pkg; $p =~ s/\.sty$//;
+    my $p      = $pkg; $p =~ s/\.sty$//;
     my $nafter = scalar(keys %{ $$self{symbols} });
     if ($nbefore > $nafter) {
       if ($base{$pkg}) {
@@ -605,10 +605,10 @@ sub scan {
           else {
             print STDERR "WARN: Couldn't find LaTeXML implementation for $pkg\n";
             return; } }
-        if    ($pkg =~ /(.*)\.pool$/) { LaTeXML::Package::LoadPool($1); }
-        elsif ($pkg =~ /(.*)\.sty$/)  { LaTeXML::Package::RequirePackage($1); }
-        elsif ($pkg =~ /(.*)\.cls$/)  { LaTeXML::Package::LoadClass($1); }
-        else { LaTeXML::Package::InputDefinitions($loadpath); } }
+        if ($pkg =~ /(.*)\.pool$/)   { LaTeXML::Package::LoadPool($1); }
+        elsif ($pkg =~ /(.*)\.sty$/) { LaTeXML::Package::RequirePackage($1); }
+        elsif ($pkg =~ /(.*)\.cls$/) { LaTeXML::Package::LoadClass($1); }
+        else                         { LaTeXML::Package::InputDefinitions($loadpath); } }
 
       print "Scanning defined symbols\n" if $::VERBOSITY >= 1;
       my $table = $$STATE{meaning};

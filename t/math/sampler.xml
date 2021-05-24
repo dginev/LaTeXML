@@ -7,7 +7,7 @@
 <?latexml package="mathtools"?>
 <?latexml package="graphicx"?>
 <?latexml RelaxNGSchema="LaTeXML"?>
-<document xmlns="http://dlmf.nist.gov/LaTeXML">
+<document xmlns="http://dlmf.nist.gov/LaTeXML" class="ltx_authors_1line">
   <resource src="LaTeXML.css" type="text/css"/>
   <resource src="ltx-article.css" type="text/css"/>
   <title>LaTeXML Math Sampler</title>

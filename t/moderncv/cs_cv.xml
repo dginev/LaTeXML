@@ -9,7 +9,7 @@
   <resource src="LaTeXML.css" type="text/css"/>
   <resource src="ltx-article.css" type="text/css"/>
   <resource src="ltx-cv.css" type="text/css"/>
-  <creator role="cv">
+  <creator>
     <contact role="firstname">Jane</contact>
     <contact role="familyname">Doe</contact>
     <contact role="position"><inline-block vattach="bottom">
@@ -20,6 +20,10 @@
     <contact role="email">email@example.com</contact>
     <contact role="homepage"><ref class="ltx_url" font="typewriter" href="https://www.example.com">https://www.example.com</ref></contact>
   </creator>
+  <creator role="author">
+    <personname/>
+  </creator>
+  <note role="thanks"/>
   <section inlist="toc" xml:id="Sx1">
     <title class="ltx_cv"><text class="ltx_section_mark"></text><text class="ltx_cv_heading" font="smallcaps">Education</text></title>
     <para class="ltx_cv_entry" xml:id="Sx1.p1">

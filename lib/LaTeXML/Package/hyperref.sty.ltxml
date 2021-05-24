@@ -193,6 +193,10 @@ DefConstructor('\hyperlink Semiverbatim {}',
   properties => sub { (id => CleanID($_[1])); });
 DefMacro('\hyper@@link{}{}{}', '\hyperlink{#2}{#3}');
 
+DefMacro('\hyper@@anchor{}{}', '\@hyper@@anchor#1\relax#2\relax');
+# TODO: Should we enable this?
+DefMacro('\@hyper@@anchor{} Match:\relax {}{} Match:\relax', '\relax');
+
 DefConstructor('\hypertarget Semiverbatim {}',
   "<ltx:anchor xml:id='#id'>#2</ltx:anchor>",
   properties => sub { (id => CleanID(ToString($_[1]))); });

@@ -30,6 +30,7 @@ DefMacro('\address{}{}', '\@add@to@frontmatter{ltx:creator}{\@@@address{#1\newli
 DefMacro('\addressfont',   Tokens());
 DefMacro('\addressstyle',  Tokens());
 DefMacro('\addresssymbol', Tokens());
+DefMacro('\@date',         Tokens());
 
 DefMacro('\cvcolumn',     Tokens());
 DefMacro('\cvcolumncell', Tokens());
@@ -66,7 +67,7 @@ DefConstructor('\@@cv@section{} Undigested OptionalUndigested Undigested', sub {
   properties => sub {
     my ($stomach, $type, $inlist, $toctitle, $title) = @_;
     my %props = RefStepID(ToString($type));
-    $props{title} = Digest(T_CS('\@hidden@bgroup'), $title, T_CS('\@hidden@egroup'));
+    $props{title}    = Digest(T_CS('\@hidden@bgroup'), $title, T_CS('\@hidden@egroup'));
     $props{toctitle} = $toctitle
       && Digest(T_CS('\@hidden@bgroup'), $toctitle, T_CS('\@hidden@egroup'));
     return %props; },
@@ -98,13 +99,13 @@ DefMacro('\moderncvstyle',     Tokens());
 #
 # TODO: should we use them in the final HTML style? Feedback from professionals welcome.
 #       for now just adding the macro support, but omitting them from the final output
-DefMacro('\marvosymbol {}',    '');
-DefMacro('\addresssymbol',     '');
-DefMacro('\mobilephonesymbol', '📱');
-DefMacro('\fixedphonesymbol',  '☎');
-DefMacro('\faxphonesymbol',    '📠');
-DefMacro('\emailsymbol',       '✉');
-DefMacro('\homepagesymbol',    '🖰');
+DefMacro('\marvosymbol {}',       '');
+DefMacro('\addresssymbol',        '');
+DefMacro('\mobilephonesymbol',    '📱');
+DefMacro('\fixedphonesymbol',     '☎');
+DefMacro('\faxphonesymbol',       '📠');
+DefMacro('\emailsymbol',          '✉');
+DefMacro('\homepagesymbol',       '🖰');
 DefMacro('\linkedinsocialsymbol', '');  # Tikz image, needs a smart workaround (font awesome maybe?)
 DefMacro('\twittersocialsymbol',  '');  # Tikz image, needs a smart workaround (font awesome maybe?)
 DefMacro('\githubsocialsymbol',   '');  # Tikz image, needs a smart workaround (font awesome maybe?)

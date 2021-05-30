@@ -98,7 +98,7 @@ DefConstructor('\documentstyle OptionalSemiverbatim SkipSpaces Semiverbatim []',
     else {
       InputDefinitions('OmniBus', type => 'cls', noerror => 1,
         handleoptions => 1, options => $options,
-        after => Tokens(T_CS('\compat@loadpackages')));
+        after         => Tokens(T_CS('\compat@loadpackages')));
       RequirePackage($class, options => $options, as_class => 1); }
     return; });
 
@@ -481,7 +481,7 @@ sub makeNoteTags {
       tags => Digest(T_BEGIN,
         T_CS('\def'), T_CS('\the' . $counter), T_BEGIN, Revert($tag), T_END,
         T_CS('\def'), T_CS('\typerefnum@' . $counter),
-        T_BEGIN, T_CS('\\' . $counter . 'typerefname'), T_SPACE, Revert($tag), T_END,
+        T_BEGIN,      T_CS('\\' . $counter . 'typerefname'), T_SPACE, Revert($tag), T_END,
         Invocation(T_CS('\lx@make@tags'), T_OTHER($counter)),
         T_END)); }
   else {
@@ -616,11 +616,11 @@ DefMacro('\@startsection{}{}{}{}{}{} OptionalMatch:*', sub {
       || LookupValue('no_number_sections')) {
       # No number, but in TOC
       (T_CS('\par'), T_CS('\@startsection@hook'), T_CS('\\@@unnumbered@section'),
-        T_BEGIN, $type->unlist, T_END,
+        T_BEGIN, $type->unlist,  T_END,
         T_BEGIN, T_OTHER('toc'), T_END); }
     else {          # Number and in TOC
       (T_CS('\par'), T_CS('\@startsection@hook'), T_CS('\\@@numbered@section'),
-        T_BEGIN, $type->unlist, T_END,
+        T_BEGIN, $type->unlist,  T_END,
         T_BEGIN, T_OTHER('toc'), T_END); } });
 
 # Not sure if this is best, but if no explicit \section'ing...
@@ -1012,9 +1012,9 @@ Let(T_CS('\@leftmark'),  T_CS('\@firstoftwo'));
 Let(T_CS('\@rightmark'), T_CS('\@secondoftwo'));
 # In normal latex, these should \clearpage; at least we want new paragraph?
 # Optional arg is sortof a heading, but w/o any particular styling(?)
-DefMacro('\twocolumn[]', '\ifx.#1.\else\par\noindent#1\fi\par');
-DefMacro('\onecolumn',   '\par');
-
+DefMacro('\twocolumn[]',   '\ifx.#1.\else\par\noindent#1\fi\par');
+DefMacro('\onecolumn',     '\par');
+DefMacro('\@topnewpage{}', '#1');
 # Style parameters from Fig. C.3, p.182
 DefRegister('\paperheight'     => Dimension(0));
 DefRegister('\paperwidth'      => Dimension(0));
@@ -1051,7 +1051,7 @@ DefConstructor('\person@thanks{}', "^ <ltx:contact role='thanks'>#1</ltx:contact
   alias => '\thanks', mode => 'text');
 DefConstructor('\@personname{}', "<ltx:personname>#1</ltx:personname>",
   beforeDigest => sub { Let('\thanks', '\person@thanks'); },
-  bounded => 1, mode => 'text');
+  bounded      => 1, mode => 'text');
 
 DefConstructorI('\and', undef, " and ");
 
@@ -1194,7 +1194,7 @@ DefEnvironment('{titlepage}', '<ltx:titlepage>#body',
       "When using titlepage, Frontmatter will not be well-structured");
     return; },
   beforeDigestEnd => sub { Digest(T_CS('\maybe@end@title')); },
-  locked => 1, mode => 'text');
+  locked          => 1, mode => 'text');
 
 Tag('ltx:titlepage', autoClose => 1);
 DefConstructorI('\maybe@end@title', undef, sub {
@@ -1411,7 +1411,7 @@ sub RefStepItemCounter {
         T_CS('\let'), T_CS('\the' . $counter),   T_CS('\@empty'),
         T_CS('\def'), T_CS('\fnum@' . $counter), T_BEGIN, $formatter, T_BEGIN, Revert($tag), T_END, T_END,
         T_CS('\def'), T_CS('\typerefnum@' . $counter),
-        T_BEGIN, $typename, T_SPACE, Revert($tag), T_END,
+        T_BEGIN,      $typename, T_SPACE, Revert($tag), T_END,
         Invocation(T_CS('\lx@make@tags'), T_OTHER($counter)),
         T_END);
 
@@ -1738,7 +1738,7 @@ DefConstructorI('\lx@@verbatim', undef,
     my ($stomach) = @_;
     StartSemiverbatim('%', '\\', '{', '}');
     MergeFont(family => 'typewriter', series => 'medium', shape => 'upright');
-    $STATE->assignCatcode(' ', CC_ACTIVE);            # Do NOT (necessarily) skip spaces after \verb!!!
+    $STATE->assignCatcode(' ', CC_ACTIVE);    # Do NOT (necessarily) skip spaces after \verb!!!
     Let(T_ACTIVE(' '), T_SPACE); });
 DefConstructorI('\lx@end@verbatim', undef,
   "</ltx:verbatim>",
@@ -2642,7 +2642,7 @@ DefPrimitive('\DeclareFontFamily{}{}{}',      undef);
 DefPrimitive('\DeclareSizeFunction{}{}',      undef);
 
 my $symboltype_roles = {
-  '\mathord' => 'ID', '\mathop' => 'BIGOP', '\mathbin' => 'BINOP', '\mathrel' => 'RELOP',
+  '\mathord'  => 'ID',   '\mathop'    => 'BIGOP', '\mathbin'   => 'BINOP', '\mathrel' => 'RELOP',
   '\mathopen' => 'OPEN', '\mathclose' => 'CLOSE', '\mathpunct' => 'PUNCT' };
 DefPrimitive('\DeclareMathSymbol DefToken SkipSpaces DefToken {}{Number}', sub {
     my ($stomach, $cs, $type, $font, $code) = @_;
@@ -2662,7 +2662,7 @@ Let('\cdp@elt', '\relax');
 DefPrimitive('\DeclareFontEncoding{}{}{}', sub {
     my ($stomach, $encoding, $x, $y) = @_;
     AddToMacro(T_CS('\cdp@list'), T_CS('\cdp@elt'),
-      T_BEGIN, $_[1]->unlist, T_END,
+      T_BEGIN, $_[1]->unlist,           T_END,
       T_BEGIN, T_CS('\default@family'), T_END,
       T_BEGIN, T_CS('\default@series'), T_END,
       T_BEGIN, T_CS('\default@shape'),  T_END);
@@ -2891,7 +2891,7 @@ sub defineNewTheorem {
         $headformatter->unlist,
         T_BEGIN, ($type ? $type->unlist : ()), T_END,
         T_CS('\the' . $counter), T_BEGIN, Tokens(T_PARAM, T_OTHER('1')), T_END,
-        T_CS('\the'), T_CS('\thm@headpunct'))
+        T_CS('\the'),            T_CS('\thm@headpunct'))
       : '{\the\thm@headfont\lx@tag{\csname fnum@' . $thmset . '\endcsname}'
         . '{' . ($type ? '\ifx.#1.\else\space\the\thm@notefont(#1)\fi' : '#1') . '}'
         . '\the\thm@headpunct}'),
@@ -3115,8 +3115,10 @@ DefConditional('\iflx@donecaption');
 DefMacro('\caption',
 '\lx@donecaptiontrue\@ifundefined{@captype}{\@@generic@caption}{\expandafter\@caption\expandafter{\@captype}}');
 # First, check for trailing \label, move it into the caption as a standard position
+# NOTE: If one day we want to unlock \@caption, make sure to test against arXiv:cond-mat/0001395 for a passing build.
 DefMacro('\@caption{}[]{}',
-  '\@ifnext\label{\@caption@postlabel{#1}{#2}{#3}}{\@caption@{#1}{#2}{#3}}');
+  '\@ifnext\label{\@caption@postlabel{#1}{#2}{#3}}{\@caption@{#1}{#2}{#3}}', locked => 1);
+
 DefMacro('\@caption@postlabel{}{}{} SkipMatch:\label Semiverbatim',
   '\@caption@{#1}{#2}{#3\label{#4}}');
 
@@ -3280,6 +3282,12 @@ DefMacroI('\figurename',  undef, 'Figure');
 DefMacroI('\figuresname', undef, 'Figures');    # Never used?
 DefMacroI('\tablename',   undef, 'Table');
 DefMacroI('\tablesname',  undef, 'Tables');
+
+Let('\outer@nobreak', '\@empty');
+DefMacro('\@dbflt{}',           '#1');
+DefMacro('\@xdblfloat{}[]',     '\@xfloat{#1}[#2]');
+DefMacro('\@floatplacement',    '');
+DefMacro('\@dblfloatplacement', '');
 
 #======================================================================
 # C.9.2 Marginal Notes
@@ -3867,7 +3875,7 @@ DefMacro('\lx@mung@bibliography{}', sub {
     if (($tag eq 'enumerate') || ($tag eq 'itemize') || ($tag eq 'description')) {
       print STDERR "\nDamn! We're in a list {$tag}; try to close it!\n";
       push(@tokens, Invocation('\end', $env),
-        T_CS('\let'), T_CS('\end' . $tag), T_CS('\endthebibliography'),
+        T_CS('\let'), T_CS('\end' . $tag),        T_CS('\endthebibliography'),
         T_CS('\let'), T_CS('\end{' . $tag . '}'), T_CS('\end{thebibliography}')); }
     # else ? it probably isn't going to work??
     print STDERR "Now, try to open {thebibliography}\n";
@@ -4372,7 +4380,7 @@ DefConstructor('\@framebox[Dimension][]{}',
     . "(<ltx:text ?#width(width='#width') ?#align(align='#align')"
     . " framed='rectangle' framecolor='#framecolor'"
     . " _noautoclose='1'>#3</ltx:text>)",
-  alias => '\framebox', sizer => '#3',
+  alias        => '\framebox', sizer => '#3',
   beforeDigest => sub {
     my ($stomach) = @_;
     my $wasmath = LookupValue('IN_MATH');
@@ -4464,7 +4472,7 @@ DefConstructor('\parbox[][Dimension][]{Dimension} VBoxContents', sub {
     (width => $_[4],
       vattach => translateAttachment($_[1]),
       height  => $_[2]); },
-  mode => 'text', bounded => 1,
+  mode         => 'text', bounded => 1,
   beforeDigest => sub {
     AssignValue('\hsize' => $_[4]);
     Let('\\\\', '\lx@parboxnewline'); });
@@ -4886,32 +4894,32 @@ DefMacro('\usefont{}{}{}{}',
 
 # If these series or shapes appear in math, they revert it to roman, medium, upright (?)
 DefConstructor('\textmd@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { series => 'medium' }, alias => '\textmd',
+  bounded      => 1, font => { series => 'medium' }, alias => '\textmd',
   beforeDigest => sub { DefMacro('\f@series', 'm'); });
 DefConstructor('\textbf@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { series => 'bold' }, alias => '\textbf',
+  bounded      => 1, font => { series => 'bold' }, alias => '\textbf',
   beforeDigest => sub { DefMacro('\f@series', 'b'); });
 DefConstructor('\textrm@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { family => 'serif' }, alias => '\textrm',
+  bounded      => 1, font => { family => 'serif' }, alias => '\textrm',
   beforeDigest => sub { DefMacro('\f@family', 'cm'); });
 DefConstructor('\textsf@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { family => 'sansserif' }, alias => '\textsf',
+  bounded      => 1, font => { family => 'sansserif' }, alias => '\textsf',
   beforeDigest => sub { DefMacro('\f@family', 'cmss'); });
 DefConstructor('\texttt@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { family => 'typewriter' }, alias => '\texttt',
+  bounded      => 1, font => { family => 'typewriter' }, alias => '\texttt',
   beforeDigest => sub { DefMacro('\f@family', 'cmtt'); });
 
 DefConstructor('\textup@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { shape => 'upright' }, alias => '\textup',
+  bounded      => 1, font => { shape => 'upright' }, alias => '\textup',
   beforeDigest => sub { DefMacro('\f@shape', ''); });
 DefConstructor('\textit@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { shape => 'italic' }, alias => '\textit',
+  bounded      => 1, font => { shape => 'italic' }, alias => '\textit',
   beforeDigest => sub { DefMacro('\f@shape', 'i'); });
 DefConstructor('\textsl@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { shape => 'slanted' }, alias => '\textsl',
+  bounded      => 1, font => { shape => 'slanted' }, alias => '\textsl',
   beforeDigest => sub { DefMacro('\f@shape', 'sl'); });
 DefConstructor('\textsc@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
-  bounded => 1, font => { shape => 'smallcaps' }, alias => '\textsc',
+  bounded      => 1, font => { shape => 'smallcaps' }, alias => '\textsc',
   beforeDigest => sub { DefMacro('\f@shape', 'sc'); });
 DefConstructor('\textnormal@math{}', "<ltx:text _noautoclose='1'>#1</ltx:text>", mode => 'text',
   bounded => 1, font => { family => 'serif', series => 'medium', shape => 'upright' }, alias => '\textnormal',
@@ -4934,7 +4942,7 @@ DefPrimitive('\DeclareTextFontCommand{}{}', sub {
     my ($stomach, $cmd, $font) = @_;
     DefConstructorI($cmd, "{}",
       "?#isMath(<ltx:text _noautoclose='1'>#1</ltx:text>)(#1)",
-      mode => 'text', bounded => 1,
+      mode         => 'text', bounded => 1,
       beforeDigest => sub { Digest($font); (); });
     return; });
 

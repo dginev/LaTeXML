@@ -249,7 +249,7 @@ sub handleTemplate {
 
 # If it is a column ending token, Returns the token, a keyword and whether it is "hidden"
 our @column_ends = (
-  [T_ALIGN, 'align', 0],
+  [T_ALIGN,               'align',  0],
   [T_CS('\cr'),           'cr',     0],
   [T_CS('\crcr'),         'crcr',   0],
   [T_CS('\hidden@cr'),    'cr',     1],
@@ -307,7 +307,7 @@ sub unread {
     map { (!defined $_ ? ()
         : (($r = ref $_) eq 'LaTeXML::Core::Token' ? $_
           : ($r eq 'LaTeXML::Core::Tokens' ? @$_
-            : Fatal('misdefined', $r, undef, "Expected a Token, got " . Stringify($_))))) }
+            : FinalError('misdefined', $r, undef, "Expected a Token, got " . Stringify($_))))) }
       @tokens);
   return; }
 
@@ -655,7 +655,7 @@ sub readTokensValue {
   my $token = $self->readNonSpace;
   if (!defined $token) {
     return; }
-  elsif ($$token[1] == CC_BEGIN) {             # Inline ->getCatcode!
+  elsif ($$token[1] == CC_BEGIN) {    # Inline ->getCatcode!
     return $self->readBalanced; }
   elsif (my $defn = $STATE->lookupDefinition($token)) {
     if ($defn->isRegister eq 'Tokens') {
@@ -666,7 +666,7 @@ sub readTokensValue {
         $self->unread(@{$x}); }
       return $self->readTokensValue; }
     else {
-      return $token; } }                       # ?
+      return $token; } }    # ?
   else {
     return $token; } }
 

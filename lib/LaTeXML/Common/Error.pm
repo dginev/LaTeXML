@@ -25,7 +25,7 @@ our @EXPORT = (
   # Managing STDERR and Logfile messages
   qw(&UseSTDERR &UseLog),
   # Error Reporting
-  qw(&Fatal &Error &Warn &Info),
+  qw(&Fatal &FinalError &Error &Warn &Info),
   # General messages
   qw(&Note &NoteSTDERR &NoteLog),
   # Progress Spinner
@@ -337,7 +337,22 @@ sub Error {
   # Note that "100" is hardwired into TeX, The Program!!!
   my $maxerrors = ($state ? $state->lookupValue('MAX_ERRORS') : 100);
   if ($state && (defined $maxerrors) && (($state->getStatus('error') || 0) > $maxerrors)) {
-    Fatal('too_many_errors', $maxerrors, $where, "Too many errors (> $maxerrors)!"); }
+    FinalError('too_many_errors', $maxerrors, $where, "Too many errors (> $maxerrors)!"); }
+  return; }
+
+# An Error which also yanks the remainder of any yet-to-be-processed data.
+#
+# Hopes to achieve better recovery than a hard Fatal().
+#   Can be used for cases where processing can realistically
+#   be expected to continue in its *NEXT PHASES*
+#
+# but *NOT* trusted with the rest of the content -
+#   if we thought more content can be processed,
+#   the softer Error() is appropriate.
+sub FinalError {
+  my ($category, $object, $where, $message, @details) = @_;
+  Error($category, $object, $where, $message, @details);
+  hardYankProcessing();
   return; }
 
 # Warning message; results may be OK, but somewhat unlikely

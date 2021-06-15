@@ -59,9 +59,9 @@ use constant CC_ACTIVE  => 13;
 use constant CC_COMMENT => 14;
 use constant CC_INVALID => 15;
 # Extended Catcodes for expanded output.
-use constant CC_CS        => 16;
-use constant CC_MARKER    => 17;    # non TeX extension!
-use constant CC_ARG       => 18;    # "out_param" in B Book
+use constant CC_CS          => 16;
+use constant CC_MARKER      => 17;    # non TeX extension!
+use constant CC_ARG         => 18;    # "out_param" in B Book
 use constant CC_SMUGGLE_THE => 19;    # defered expansion once
 
 # [The documentation for constant is a bit confusing about subs,
@@ -76,11 +76,11 @@ use constant T_SUPER => bless ['^',  CC_SUPER], 'LaTeXML::Core::Token';
 use constant T_SUB   => bless ['_',  CC_SUB],   'LaTeXML::Core::Token';
 use constant T_SPACE => bless [' ',  CC_SPACE], 'LaTeXML::Core::Token';
 use constant T_CR    => bless ["\n", CC_SPACE], 'LaTeXML::Core::Token';
-sub T_LETTER { my ($c) = @_; return bless [$c, CC_LETTER], 'LaTeXML::Core::Token'; }
-sub T_OTHER  { my ($c) = @_; return bless [$c, CC_OTHER],  'LaTeXML::Core::Token'; }
-sub T_ACTIVE { my ($c) = @_; return bless [$c, CC_ACTIVE], 'LaTeXML::Core::Token'; }
+sub T_LETTER  { my ($c) = @_; return bless [$c, CC_LETTER], 'LaTeXML::Core::Token'; }
+sub T_OTHER   { my ($c) = @_; return bless [$c, CC_OTHER],  'LaTeXML::Core::Token'; }
+sub T_ACTIVE  { my ($c) = @_; return bless [$c, CC_ACTIVE], 'LaTeXML::Core::Token'; }
 sub T_COMMENT { my ($c) = @_; return bless ['%' . ($c || ''), CC_COMMENT], 'LaTeXML::Core::Token'; }
-sub T_CS { my ($c) = @_; return bless [$c, CC_CS], 'LaTeXML::Core::Token'; }
+sub T_CS      { my ($c) = @_; return bless [$c, CC_CS], 'LaTeXML::Core::Token'; }
 # Illegal: don't use unless you know...
 sub T_MARKER { my ($t) = @_; return bless [$t, CC_MARKER], 'LaTeXML::Core::Token'; }
 
@@ -92,7 +92,7 @@ sub T_ARG {
     my $v_str = $$v[0];
     $int = int($$v[0]);
     if ($int < 1 || $int > 9) {
-      Fatal('malformed', 'T_ARG', 'value should be #1-#9', "Illegal: " . $v->stringify); } }
+      FinalError('malformed', 'T_ARG', 'value should be #1-#9', "Illegal: " . $v->stringify); } }
   return bless ["$int", CC_ARG], 'LaTeXML::Core::Token'; }
 
 # This hides tokens coming from \the (-like) primitives from expansion; CC_CS,CC_ACTIVE, but also CC_PARAM and CC_ARG
@@ -219,7 +219,7 @@ our @CATCODE_SHORT_NAME =          #[CONSTANT]
   T_SUB T_IGNORE T_SPACE T_LETTER
   T_OTHER T_ACTIVE T_COMMENT T_INVALID
   T_CS T_MARKER T_ARG T_SMUGGLE_THE
-);
+  );
 
 our $SMUGGLE_THE_COMMANDS = {
   '\the'        => 1,
@@ -309,7 +309,7 @@ sub with_dont_expand {
   my $cc = $$self[1];
   if ($cc == CC_SMUGGLE_THE) {
     # LaTeXML Bug, we haven't correctly emulated scan_toks! Offending token was:
-    Fatal('unexpected', 'CC_SMUGGLE_THE', 'We are marking as \noexpand a masked \the-produced token, this must Never happen.', "Illegal: " . $self->stringify); }
+    FinalError('unexpected', 'CC_SMUGGLE_THE', 'We are marking as \noexpand a masked \the-produced token, this must Never happen.', "Illegal: " . $self->stringify); }
   return ((($cc == CC_CS) || ($cc == CC_ACTIVE))
     # AND it is either undefined, or is expandable!
       && (!defined($STATE->lookupDefinition($self))

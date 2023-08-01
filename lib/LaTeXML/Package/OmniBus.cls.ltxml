@@ -54,7 +54,7 @@ Let('\lx@OmniBus@saved@bibitem', '\bibitem');
 # when it would otherwise be too late to fix.
 DefPrimitive('\lx@late@usepackage Semiverbatim', sub { RequirePackage(ToString($_[1])); });
 DefMacro('\bibitem',
-'\@ifnext@n{[\protect\citeauthoryear}{\lx@late@usepackage{natbib}\bibitem}{\lx@OmniBus@saved@bibitem}');
+'\@ifnext@n{[\protect\citeauthoryear}{\lx@late@usepackage{natbib}\let\lx@OmniBus@saved@bibitem\bibitem}{\lx@OmniBus@saved@bibitem}');
 DefEnvironment('{frontmatter}', '#body');
 DefEnvironment('{mainmatter}',  '#body');
 DefEnvironment('{backmatter}',  '#body');

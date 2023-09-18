@@ -26,6 +26,7 @@ LATEXMLDIR=$TOOLSDIR/..
 # We are pre-compiling schema that will be commited to the repository.
 RESOURCEDIR=$LATEXMLDIR/lib/LaTeXML/resources
 RELAXNGDIR=$RESOURCEDIR/RelaxNG
+XSLTDIR=$RESOURCEDIR/XSLT
 
 TRANG="trang -C $LATEXMLDIR/lib/LaTeXML/LaTeXML.catalog"
 
@@ -66,6 +67,8 @@ done
 #======================================================================
 # Compiling schema to quick loading form.
 #======================================================================
+MODEL_FILE="$RELAXNGDIR/$SCHEMA.model"
+
 echo "Precompiling $SCHEMA.rng schema to $SCHEMA.model"
  perl -I $LATEXMLDIR/blib/lib -MLaTeXML -MLaTeXML::Common::Error \
        -e "UseSTDERR(); my \$latexml = LaTeXML::Core->new(searchpaths=>['$RELAXNGDIR'], verbosity=>2);
@@ -80,8 +83,35 @@ echo "Precompiling $SCHEMA.rng schema to $SCHEMA.model"
               \$model->setRelaxNGSchema('$SCHEMA');         \
               \$model->compileSchema;                       \
               print STDERR \$state->getStatusMessage.\"\n\";});" \
-       > $RELAXNGDIR/$SCHEMA.model
+       > $MODEL_FILE
 
+
+if [ -f "$MODEL_FILE" ]; then
+  echo "Generating LaTeXML-schema-util.xsl convenience predicates"
+  cp $XSLTDIR/LaTeXML-schema-util.in $XSLTDIR/LaTeXML-schema-util.xsl
+  perl -e "use strict; use warnings;
+            open(my \$model_fh, '<', '$MODEL_FILE');
+            while(<\$model_fh>) {
+                  if (/(^[A-Z]\w+)\:\=\(([^\)]+)/) {
+                        my \$name = lc(\$1);
+                        my \$tags = \$2;
+                        print \"\n\";
+                        print '  <func:function name=\"f:is_in_schema_class_';
+                        print \$name;
+                        print \"\\\"\>\n\";
+                        print \"    <xsl:param name=\\\"name\\\"/>\n\";
+                        print \"    <xsl:param name=\\\"nsuri\\\"/>\n\";
+                        print \"    <func:result>\n\";
+                        print '      <xsl:value-of select=\"not(\$nsuri and \$nsuri != \$LATEXML_NSURI) and (\$name = \\'';
+                        print join('\\' or \$name = \\'', map {s/^ltx://; \$_} split(',',\$tags));
+                        print \"\\')\\\"/\>\n\";
+                        print \"    </func:result\>\n\";
+                        print \"  </func:function\>\n\";
+                  }
+            }
+            print \"</xsl:stylesheet>\n\";" \
+      >> $XSLTDIR/LaTeXML-schema-util.xsl
+fi
 #======================================================================
 # If ok...
 echo "==============================="

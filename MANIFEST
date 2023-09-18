@@ -283,6 +283,8 @@ lib/LaTeXML/resources/XSLT/LaTeXML-meta-xhtml.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-misc-xhtml.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-para-xhtml.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-picture-xhtml.xsl
+lib/LaTeXML/resources/XSLT/LaTeXML-schema-util.in
+lib/LaTeXML/resources/XSLT/LaTeXML-schema-util.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-structure-xhtml.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-tabular-xhtml.xsl
 lib/LaTeXML/resources/XSLT/LaTeXML-webpage-xhtml.xsl

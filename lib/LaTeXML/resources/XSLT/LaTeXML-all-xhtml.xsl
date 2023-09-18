@@ -22,7 +22,7 @@
   <!-- Note that you can include these in your own stylesheet using urns like:
        <xsl:import href="urn:x-LaTeXML:XSLT:LaTeXML-common.xsl"/>
   -->
-
+  <xsl:import href="LaTeXML-schema-util.xsl"/>
   <xsl:import href="LaTeXML-common.xsl"/>
   <xsl:import href="LaTeXML-inline-xhtml.xsl"/>
   <xsl:import href="LaTeXML-block-xhtml.xsl"/>

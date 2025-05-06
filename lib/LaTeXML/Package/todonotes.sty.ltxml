@@ -29,6 +29,11 @@ RequirePackage('tikz');
 #usetikzlibrary{positioning}
 RequirePackage('calc');
 
+DeclareOption('disable', sub {
+    DefMacro('\todo[]{}', '', locked => 1);
+    RawTeX('\@todonotes@disabledtrue');
+});
+
 DefMacroI('\ext@todo', undef, 'todo');
 NewCounter('todo');
 DefMacro('\todotyperefname',   'ToDo');
@@ -39,9 +44,38 @@ DefMacro('\listoftodos',       '');
 DefMacro('\@todo[]{}',         '');
 DefMacro('\setuptodonotes{}',  '');
 
-DeclareOption('disable', sub {
-    DefMacro('\todo[]{}', '', locked => 1);
-});
+DefMacro('\@todonotes@backgroundcolor', 'orange');
+DefMacro('\@todonotes@textcolor',       'black');
+DefMacro('\@todonotes@linecolor',       'orange');
+DefMacro('\@todonotes@bordercolor',     'black');
+DefMacro('\@todonotes@tickmarkheight',  'unused value');
+DefMacro('\@todonotes@textwidth',       '\marginparwidth');
+DefMacro('\@todonotes@textsize',        '\normalsize');
+DefMacro('\@todonotes@figwidth',        '\linewidth');
+DefMacro('\@todonotes@figheight',       '4cm');
+DefMacro('\@todonotes@figcolor',        'black!40');
+
+DefConditional('\if@todonotes@reverseMissingFigureTriangle');
+DefConditional('\if@todonotes@obeyDraft');
+DefConditional('\if@todonotes@isDraft');
+DefConditional('\if@todonotes@obeyFinal');
+DefConditional('\if@todonotes@isFinal');
+DefConditional('\if@todonotes@disabled');
+DefConditional('\if@todonotes@colorinlistoftodos');
+DefConditional('\if@todonotes@dviStyle');
+DefConditional('\if@todonotes@prependcaptionglobal');
+DefConditional('\if@todonotes@shadowlibraryloaded');
+DefConditional('\if@todonotes@useshadow');
+DefConditional('\if@todonotes@localdisable');
+DefConditional('\if@todonotes@appendtolistoftodos');
+DefConditional('\if@todonotes@inlinenote');
+DefConditional('\if@todonotes@prependcaption');
+DefConditional('\if@todonotes@line');
+DefConditional('\if@todonotes@fancyline');
+DefConditional('\if@todonotes@authorgiven');
+DefConditional('\if@todonotes@captiongiven');
+DefConditional('\if@todonotes@inlinepar');
+DefConditional('\if@todonotes@vmode');
 
 ProcessOptions();
 

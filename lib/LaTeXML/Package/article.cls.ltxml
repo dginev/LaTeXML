@@ -19,23 +19,51 @@ LoadPool('LaTeX');
 #**********************************************************************
 # Option handling
 foreach my $option (qw(10pt 11pt 12pt
-  letterpaper legalpaper executivepaper a4paper a5paper b5paper
-  landscape
+  legalpaper landscape
   final draft
   oneside twoside
   openright openany
   notitlepage titlepage)) {
   DeclareOption($option, undef); }
 
-DeclareOption('onecolumn',
-  '\@twocolumnfalse\columnwidth\textwidth');
+DeclareOption('a4paper', <<'EOL');
+\setlength\paperheight {297mm}%
+\setlength\paperwidth  {210mm}%
+EOL
+DeclareOption('a5paper', <<'EOL');
+\setlength\paperheight {210mm}%
+\setlength\paperwidth  {148mm}%
+EOL
+DeclareOption('b5paper', <<'EOL');
+\setlength\paperheight {250mm}%
+\setlength\paperwidth  {176mm}%
+EOL
+DeclareOption('letterpaper', <<'EOL');
+\setlength\paperheight {11in}%
+\setlength\paperwidth  {8.5in}%
+EOL
+DeclareOption('legalpaper', <<'EOL');
+\setlength\paperheight {14in}%
+\setlength\paperwidth  {8.5in}%
+EOL
+DeclareOption('executivepaper', <<'EOL');
+\setlength\paperheight {10.5in}%
+\setlength\paperwidth  {7.25in}%
+EOL
+
+DeclareOption('onecolumn', <<'EOL');
+\global\columnwidth\textwidth%
+\global\hsize\columnwidth%
+\global\linewidth\columnwidth%
+\global\@twocolumnfalse%
+EOL
 DeclareOption('twocolumn',
   '\@twocolumntrue\columnwidth\textwidth\advance\columnwidth-\columnsep\divide\columnwidth2\relax');
 DeclareOption('openbib', sub {
     RequireResource(undef, type => 'text/css', content => '.ltx_bibblock{display:block;}'); });
 DeclareOption('leqno', sub { AssignMapping('DOCUMENT_CLASSES', ltx_leqno => 1); });
 DeclareOption('fleqn', sub { AssignMapping('DOCUMENT_CLASSES', ltx_fleqn => 1); });
-
+ExecuteOptions('letterpaper', '10pt', 'oneside', 'onecolumn', 'final');
 ProcessOptions();
 
 #**********************************************************************

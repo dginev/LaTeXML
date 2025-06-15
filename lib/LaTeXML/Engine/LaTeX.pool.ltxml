@@ -302,7 +302,9 @@ DefConstructor('\lx@newline OptionalMatch:* [Glue]', sub {
         $document->maybeCloseElement('ltx:p'); }
       elsif ($document->canContain($context, 'ltx:break')) {
         $document->insertElement('ltx:break'); } } },
+  sizer      => sub { return (Dimension(0), $_[0]->getArg(2) || Dimension(0), Dimension(0)); },
   reversion  => Tokens(T_CS("\\\\"), T_CR),
+  mode       => 'internal_vertical',
   properties => { isBreak => 1 });
 Let('\\\\', '\lx@newline');
 
@@ -1517,7 +1519,7 @@ sub beginItemize {
     ResetCounter($usecounter); }
 ##  return RefStepCounter('@itemize' . $listpostfix); }
   return (RefStepCounter('@itemize' . $listpostfix),
-    counter => $usecounter, series => $series); }    # So end can save counter value
+    counter => $usecounter, series => $series, layout => 'vertical'); }  # So end can save counter value
 
 # These counters are ONLY used for id's of ALL the various itemize, enumerate, etc elements
 # Only create the 1st level (so that binding style can start numbering 'within' appropriately)
@@ -1648,18 +1650,18 @@ DefEnvironment('{itemize}',
   "<ltx:itemize xml:id='#id'>#body</ltx:itemize>",
   properties      => sub { beginItemize('itemize', '@item'); },
   beforeDigestEnd => sub { Digest('\par'); },
-  locked          => 1, mode => 'text');
+  locked          => 1, mode => 'internal_vertical');
 DefEnvironment('{enumerate}',
   "<ltx:enumerate xml:id='#id'>#body</ltx:enumerate>",
   properties      => sub { beginItemize('enumerate', 'enum'); },
   beforeDigestEnd => sub { Digest('\par'); },
-  locked          => 1, mode => 'text');
+  locked          => 1, mode => 'internal_vertical');
 DefEnvironment('{description}',
   "<ltx:description  xml:id='#id'>#body</ltx:description>",
   beforeDigest    => sub { Let('\makelabel', '\descriptionlabel'); },
   properties      => sub { beginItemize('description', '@desc'); },
   beforeDigestEnd => sub { Digest('\par'); },
-  locked          => 1, mode => 'text');
+  locked          => 1, mode => 'internal_vertical');
 
 DefMacro('\makelabel{}', '#1');
 DefMacro('\@mklab{}',    '\hfil #1');
@@ -2292,7 +2294,7 @@ DefConstructor('\lx@equationgroup@subnumbering@begin',
     AssignValue(SAVED_EQUATION_NUMBER => LookupRegister('\c@equation'));
     $whatsit->setProperties(%eqn);
     ResetCounter('equation');
-    DefMacroI('\theequation',    undef, UnTeX($eqnum, 1) . '\alph{equation}');
+    DefMacroI('\theequation',    undef, UnTeX($eqnum,   1) . '\alph{equation}');
     DefMacroI('\theequation@ID', undef, UnTeX($eqn{id}, 1) . '.\@equation@ID'); });
 Tag('ltx:equationgroup', autoClose => 1);
 DefConstructor('\lx@equationgroup@subnumbering@end', sub {
@@ -3803,8 +3805,8 @@ sub tabularBindings {
     if ($str != 1) {
       $properties{attributes}{rowsep} = Dimension(($str - 1) . 'em'); } }
   if (!defined $properties{strut}) {
-    $properties{isLaTeX}=1;
-    $properties{strut} = LookupRegister('\baselineskip'); }    # Account for html space
+    $properties{isLaTeX} = 1;
+    $properties{strut}   = LookupRegister('\baselineskip'); }    # Account for html space
   alignmentBindings($template, 'text', %properties);
   Let("\\\\",            '\@tabularcr');
   Let('\lx@intercol',    '\lx@text@intercol');
@@ -4855,7 +4857,7 @@ DefConstructor('\@framebox[Dimension][]{}',
   beforeDigest => sub {
     my ($stomach) = @_;
     my $wasmath = LookupValue('IN_MATH');
-#    $stomach->beginMode('text');
+    #    $stomach->beginMode('text');
     $stomach->beginMode('restricted_horizontal');
     AssignValue(FRAME_IN_MATH => $wasmath); },
   properties => sub {
@@ -4868,7 +4870,7 @@ DefConstructor('\@framebox[Dimension][]{}',
     my ($stomach, $whatsit) = @_;
     my $wasmath = LookupValue('FRAME_IN_MATH');
     my $arg     = $whatsit->getArg(3);
-#    $stomach->endMode('text');
+    #    $stomach->endMode('text');
     $stomach->endMode('restricted_horizontal');
     if ($wasmath && $arg->isMath) {
       $whatsit->setProperties(mathframe => 1, inner => $arg->getBody); }

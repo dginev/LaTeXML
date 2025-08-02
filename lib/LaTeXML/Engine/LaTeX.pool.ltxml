@@ -3451,6 +3451,21 @@ sub arrange_panels_and_breaks {
     AssignValue('figure_panel_break_names', $panel_break_names, 'global'); }
   for my $child (element_nodes($node)) {
     my $child_name = $document->getNodeQName($child);
+    # This ltx:note treatment is kind of awkward and potentially incomplete.
+    # HTML has a limited allowance on where auxiliary nodes are allowed to appear within a figure,
+    # e.g. not before a leading <figure><figcaption/> or after a trailing <figcaption/></figure>.
+    # This could be quite finnicky to arrange while keeping the LaTeX-implied order of the notes.
+    # And free floating notes in a large subfigure-based figure would also be messy.
+    # For now, move top-level notes to the nearest caption
+    if ($child_name eq 'ltx:note') {
+      if (my $caption = $document->findnode('preceding-sibling::ltx:caption', $child) ||
+        $document->findnode('following-sibling::ltx:caption', $child)) {
+        # move to the appropriate caption
+        $document->removeNode($child);
+        $document->appendTree($caption, $child);
+        # and proceed to the next child
+        next; } }
+    # no caption? should be safe to leave it in-place and proceed as usual
     if ($$panel_break_names{$child_name}) {
       # reset bookkeeping on prior breaks, be they author-deposited or computed
       # (caption/metadata bits also flush the current line, but we avoid the explicit break element)

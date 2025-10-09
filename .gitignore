@@ -22,6 +22,7 @@ save/
 *.aux
 *.log
 *.xdv
+*.out
 # auxiliary files from using "patch"
 *.orig
 *.rej

@@ -146,16 +146,6 @@ DefConstructor('\lxSVG@insertpicture{}', sub {
       T_CS('\pgfpicture'), T_CS('\makeatletter'), $whatsit->getArg(1)->revert, T_CS('\endpgfpicture'),
       T_END,               T_END) });    # ?
 
-DefParameterType('SVGMoveableBox', sub {
-    my ($gullet) = @_;
-    $gullet->skipSpaces;
-    my ($box, @stuff) = $STATE->getStomach->invokeToken($gullet->readXToken(1));
-    Error(":expected:<box>  A <svghbox> was supposed to be here, got "
-        . Stringify($box))
-      unless $box && $box->isa('LaTeXML::Core::Whatsit')
-      && ($box->getDefinition->getCSName =~ /^(\\hbox||)$/);
-    $box; });
-
 # Check whether a svg:foreignObject is open,
 # but don't check beyond an svg:svg node, in case we're nested.
 sub foreignObjectCheck {

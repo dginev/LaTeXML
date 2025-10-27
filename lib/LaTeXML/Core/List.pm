@@ -35,23 +35,44 @@ sub List {
   if ((scalar(@boxes) >= 2) && ($boxes[-2] eq 'mode')) {
     $mode = pop(@boxes); pop(@boxes); }
   else {
-    $mode = $STATE->lookupValue('MODE'); } # HOPEFULLY, mode hasn't changed by now?
-  @boxes = grep { defined $_ } @boxes;    # strip out undefs
-  # Simplify single box, IFF NOT vertical list or box IS vertical
+    $mode = $STATE->lookupValue('MODE'); }    # HOPEFULLY, mode hasn't changed by now?
+  @boxes = grep { defined $_ } @boxes; # strip out undefs
+                                       # Simplify single box, IFF NOT vertical list or box IS vertical
   if ((scalar(@boxes) == 1)
-      && (!$mode || ($mode !~ /vertical$/)
-          || (($boxes[0]->getProperty('mode')||'') =~ /vertical$/))) {
-    return $boxes[0]; }                   # Simplify!
+    && (!$mode || ($mode !~ /vertical$/)
+      || (($boxes[0]->getProperty('mode') || '') =~ /vertical$/))) {
+    return $boxes[0]; }                # Simplify!
   else {
     # Flatten horizontal lists within horizontal lists
-    if($mode eq 'horizontal'){
+    if ($mode =~ /horizontal$/) {
       @boxes = map { ((ref $_ eq 'LaTeXML::Core::List')
-                      && (($_->getProperty('mode')||'') eq 'horizontal')
-                      ? $_->unlist : $_); } @boxes; }
+            && (($_->getProperty('mode') || 'restricted_horizontal') =~ /horizontal$/)
+          ? $_->unlist : $_); } @boxes; }
+    elsif ($mode =~ /vertical$/) {
+      # Group together horizontal boxes within vertical lists
+      my @grouped = ();
+      while (my $b = shift @boxes) {
+        my $bmode = $b->getProperty('mode') || '';
+        if (($bmode =~ /horizontal$/) && @boxes) {
+          my @hboxes = ($b);
+          while (my $mayb = shift @boxes) {
+            my $maybmode = $mayb->getProperty('mode') || '';
+            if ($maybmode ne 'vertical') {
+              push(@hboxes, $mayb); }
+            else {
+              unshift(@boxes, $mayb);
+              last; } }
+          if (scalar(@hboxes) > 1) {
+            push(@grouped, List(@hboxes, mode => $bmode)); }
+          else {
+            push(@grouped, $hboxes[0]); }
+        } else {
+          push(@grouped, $b); } }
+      @boxes = @grouped; }
     my $list = LaTeXML::Core::List->new(@boxes);
-    $list->setProperty(mode => $mode);
+    $list->setProperty(mode  => $mode);
     $list->setProperty(width => LaTeXML::Package::LookupRegister('\hsize'))
-        if $mode eq 'horizontal';
+      if $mode eq 'horizontal';
     return $list; } }
 
 sub new {

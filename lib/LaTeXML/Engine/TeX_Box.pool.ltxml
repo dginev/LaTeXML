@@ -36,20 +36,7 @@ DefPrimitive(T_BEGIN, sub {
     my $ismath = $STATE->lookupValue('IN_MATH');
     my $mode   = $STATE->lookupValue('MODE');
     my @body   = $stomach->digestNextBody();
-    if ($mode !~ /horizontal$/) {
-      # If @body contains any horizontal boxes we should partition all following boxes into
-      # a new horizontal list:
-      my @auto_horizontal_body = ();
-      while (my $b = shift @body) {
-        my $bmode = $b->getProperty('mode') || 'internal_horizontal';
-        if ($bmode =~ /horizontal$/ && @body) {
-          push(@auto_horizontal_body, List($b, @body, mode => $bmode));
-          last;
-        } else {
-          push(@auto_horizontal_body, $b); } }
-      return List($open, @auto_horizontal_body, mode => $mode); }
-    else {
-      List($open, @body, mode => $mode); } });
+    List($open, @body, mode => $mode); });
 
 #######DefPrimitive('}', sub {
 DefPrimitive(T_END, sub {

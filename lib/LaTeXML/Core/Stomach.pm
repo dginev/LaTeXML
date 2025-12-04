@@ -137,8 +137,11 @@ sub digest {
             $$self{gullet}->getPendingComment || $$self{gullet}->readXToken(1))) {
         push(@LaTeXML::LIST, invokeToken($self, $token));
         last if $initdepth > scalar(@{ $$self{boxing} }); }    # if we've closed the initial mode.
-      List(@LaTeXML::LIST, mode => $mode);
-    }); }
+      if (scalar(@LaTeXML::LIST) != 1) {
+        return List(@LaTeXML::LIST, ($mode ? (mode => $mode) : ()));
+      } else {
+        return $LaTeXML::LIST[0];
+      } }); }
 
 # Invoke a token;
 # If it is a primitive or constructor, the definition will be invoked,
@@ -231,13 +234,13 @@ sub invokeToken_simple {
   my $cc   = $meaning->getCatcode;
   my $font = $STATE->lookupValue('font');
   if ($cc == CC_SPACE) {
-    $STATE->clearPrefixes;                   # prefixes shouldn't apply here.
-    if($STATE->lookupValue('MODE') =~ /(?:math|vertical)$/) {
+    $STATE->clearPrefixes;    # prefixes shouldn't apply here.
+    if ($STATE->lookupValue('MODE') =~ /(?:math|vertical)$/) {
       return (); }
     else {
       enterHorizontal($self);
       return Box($meaning->toString, $font, $$self{gullet}->getLocator, $meaning); } }
-  elsif ($cc == CC_COMMENT) {                # Note: Comments need char decoding as well!
+  elsif ($cc == CC_COMMENT) {    # Note: Comments need char decoding as well!
     my $comment = LaTeXML::Package::FontDecodeString($meaning->toString, undef, 1);
     # However, spaces normally would have be digested away as positioning...
     my $badspace = pack('U', 0xA0) . "\x{0335}";    # This is at space's pos in OT1
@@ -325,16 +328,16 @@ sub bgroup {
 
 sub egroup {
   my ($self) = @_;
-  if ($STATE->isValueBound('BOUND_MODE', 0)) { # Last stack frame was a mode switch!?!?!
-    # Don't pop if there's an error; maybe we'll recover?
+  if ($STATE->isValueBound('BOUND_MODE', 0)) {    # Last stack frame was a mode switch!?!?!
+                                                  # Don't pop if there's an error; maybe we'll recover?
     Error('unexpected', $LaTeXML::CURRENT_TOKEN, $self,
-      "Attempt to close a group that switched to mode ".$STATE->lookupValue('MODE'),
+      "Attempt to close a group that switched to mode " . $STATE->lookupValue('MODE'),
       currentFrameMessage($self)); }
-  elsif ($STATE->lookupValue('groupNonBoxing')) { # or group was opened with \begingroup
+  elsif ($STATE->lookupValue('groupNonBoxing')) {    # or group was opened with \begingroup
     Error('unexpected', $LaTeXML::CURRENT_TOKEN, $self,
       "Attempt to close boxing group",
       currentFrameMessage($self)); }
-  else {                                        # Don't pop if there's an error; maybe we'll recover?
+  else {    # Don't pop if there's an error; maybe we'll recover?
     popStackFrame($self, 0); }
   return; }
 
@@ -345,16 +348,16 @@ sub begingroup {
 
 sub endgroup {
   my ($self) = @_;
-  if ($STATE->isValueBound('BOUND_MODE', 0)) { # Last stack frame was a mode switch!?!?!
-    # Don't pop if there's an error; maybe we'll recover?
+  if ($STATE->isValueBound('BOUND_MODE', 0)) {    # Last stack frame was a mode switch!?!?!
+                                                  # Don't pop if there's an error; maybe we'll recover?
     Error('unexpected', $LaTeXML::CURRENT_TOKEN, $self,
-      "Attempt to close a group that switched to mode ".$STATE->lookupValue('MODE'),
+      "Attempt to close a group that switched to mode " . $STATE->lookupValue('MODE'),
       currentFrameMessage($self)); }
   elsif (!$STATE->lookupValue('groupNonBoxing')) {    # or group was opened with \bgroup
     Error('unexpected', $LaTeXML::CURRENT_TOKEN, $self,
       "Attempt to close non-boxing group",
       currentFrameMessage($self)); }
-  else {                                         # Don't pop if there's an error; maybe we'll recover?
+  else {    # Don't pop if there's an error; maybe we'll recover?
     popStackFrame($self, 1); }
   return; }
 
@@ -390,41 +393,41 @@ sub endgroup {
 #----------------------------------------------------------------------
 # These are the only modes that you can beginMode|endMode, and must be entered that way.
 our %bindable_mode = (
-    text                  => 'restricted_horizontal',
-    restricted_horizontal => 'restricted_horizontal',
-    vertical              => 'internal_vertical',
-    internal_vertical     => 'internal_vertical',
-    math                  => 'math',
-    inline_math           => 'math',
-    display_math          => 'display_math');
+  text                  => 'restricted_horizontal',
+  restricted_horizontal => 'restricted_horizontal',
+  vertical              => 'internal_vertical',
+  internal_vertical     => 'internal_vertical',
+  math                  => 'math',
+  inline_math           => 'math',
+  display_math          => 'display_math');
 
 # Switch to horizontal mode, w/o stacking the mode
 # Can really only switch to horizontal mode from vertical|internal_vertical,
 # so no math, font, etc changes are needed.
 sub enterHorizontal {
-  my($self) = @_;
-  my $mode  = $STATE->lookupValue('MODE');
-  if($mode =~ /vertical$/){
-    Debug("MODE enter horizontal, from $mode, for ".Stringify($LaTeXML::CURRENT_TOKEN))
-        if $LaTeXML::DEBUG{modes};
-    $STATE->assignValue(MODE => 'horizontal', 'inplace'); } # SAME frame as BOUND_MODE!
-  elsif (($mode =~ /horizontal$/) || ($mode =~ /math$/)) { } # ignorable?
+  my ($self) = @_;
+  my $mode = $STATE->lookupValue('MODE');
+  if ($mode =~ /vertical$/) {
+    Debug("MODE enter horizontal, from $mode, for " . Stringify($LaTeXML::CURRENT_TOKEN))
+      if $LaTeXML::DEBUG{modes};
+    $STATE->assignValue(MODE => 'horizontal', 'inplace'); }    # SAME frame as BOUND_MODE!
+  elsif (($mode =~ /horizontal$/) || ($mode =~ /math$/)) { }    # ignorable?
   else {
-    Warn('unexpected',$mode,$self,
+    Warn('unexpected', $mode, $self,
       "Cannot switch to horizontal mode from $mode"); }
   return; }
 
 # Resume vertical mode, if in horizontal mode, by executing \par, in TeX-like fashion.
 sub leaveHorizontal {
-  my($self) = @_;
-  my $mode  = $STATE->lookupValue('MODE');
-  my $bound = $STATE->lookupValue('BOUND_MODE');
+  my ($self) = @_;
+  my $mode   = $STATE->lookupValue('MODE');
+  my $bound  = $STATE->lookupValue('BOUND_MODE');
   # This needs to be an invisible, and slightly gentler, \par (see \lx@normal@par)
   # BUT still allow user defined \par !
   if (($mode eq 'horizontal') && ($bound =~ /vertical$/)) {
     local $LaTeXML::INTERNAL_PAR = 1;
-    Debug("MODE leaving $mode via \\par (within $bound), for ".Stringify($LaTeXML::CURRENT_TOKEN))
-        if $LaTeXML::DEBUG{modes};
+    Debug("MODE leaving $mode via \\par (within $bound), for " . Stringify($LaTeXML::CURRENT_TOKEN))
+      if $LaTeXML::DEBUG{modes};
     push(@LaTeXML::LIST, $self->invokeToken(T_CS('\par'))); }
   return; }
 
@@ -432,51 +435,53 @@ sub leaveHorizontal {
 # Note that TeX would have done paragraph line-breaking, resulting in essentially
 # a vertical list.
 sub repackHorizontal {
-  my($self)=@_;
+  my ($self) = @_;
   my @para = ();
   my $item;
   my $mode;
   my $keep = 0;
-  while(@LaTeXML::LIST
-        && ($item = $LaTeXML::LIST[-1])
-        && (($mode = ($item->getProperty('mode')||'horizontal'))
-            =~ /^(?:horizontal|restricted_horizontal|math)$/)) {
+  while (@LaTeXML::LIST
+    && ($item = $LaTeXML::LIST[-1])
+    && (($mode = ($item->getProperty('mode') || 'horizontal'))
+      =~ /^(?:horizontal|restricted_horizontal|math)$/)) {
     # if ONLY horizontal mode spaces, we can prune them; it just makes an empty ltx:p
-    $keep = 1 if ($mode ne 'horizontal') || ! $item->getProperty('isSpace');
-    unshift(@para,pop(@LaTeXML::LIST)); }
-  push(@LaTeXML::LIST, List(@para, mode=>'horizontal')) if $keep;
+    $keep = 1 if ($mode ne 'horizontal') || !$item->getProperty('isSpace');
+    unshift(@para, pop(@LaTeXML::LIST)); }
+  my $repacked = List(@para, mode => 'horizontal');
+  Note("repacked: " . Stringify($repacked)) if $LaTeXML::DEBUG{modes};
+  push(@LaTeXML::LIST, $repacked)           if $keep;
   return; }
 
 # Resume vertical mode, internal form: reset mode, and repacks recently
 # digested horizontal items. This is useful within argument digestion, eg.
 sub leaveHorizontal_internal {
-  my($self) = @_;
-  my $mode  = $STATE->lookupValue('MODE');
-  my $bound = $STATE->lookupValue('BOUND_MODE');
+  my ($self) = @_;
+  my $mode   = $STATE->lookupValue('MODE');
+  my $bound  = $STATE->lookupValue('BOUND_MODE');
   # This needs to be an invisible, and slightly gentler, \par (see \lx@normal@par)
   # BUT still allow user defined \par !
-  if (($mode eq 'horizontal') && ($bound =~ /vertical$/)) {
-    Debug("MODE leave $mode, resuming $bound, for ".Stringify($LaTeXML::CURRENT_TOKEN))
-        if $LaTeXML::DEBUG{modes};
-    repackHorizontal($self);
+  repackHorizontal($self);
+  if (($mode =~ /horizontal$/) && ($bound =~ /vertical$/)) {
+    Debug("MODE leave $mode, resuming $bound, for " . Stringify($LaTeXML::CURRENT_TOKEN))
+      if $LaTeXML::DEBUG{modes};
     $STATE->assignValue(MODE => $bound, 'inplace'); }
- return; }
+  return; }
 
 sub beginMode {
   my ($self, $umode) = @_;
   if (my $mode = $bindable_mode{$umode}) {
     my $prevmode  = $STATE->lookupValue('MODE');
     my $prevbound = $STATE->lookupValue('BOUND_MODE');
-    my $ismath    = $mode =~ /math$/;
+    my $ismath    = $mode     =~ /math$/;
     my $wasmath   = $prevmode =~ /math$/;
-    pushStackFrame($self);    # Effectively bgroup
-    $STATE->assignValue(BOUND_MODE => $mode,   'local'); # New value within this frame!
+    pushStackFrame($self);                                  # Effectively bgroup
+    $STATE->assignValue(BOUND_MODE => $mode,   'local');    # New value within this frame!
     $STATE->assignValue(MODE       => $mode,   'local');
     $STATE->assignValue(IN_MATH    => $ismath, 'local');
     Debug("MODE bind $mode, from $prevmode "
-          .($prevbound eq $prevmode ? '' : "(in $prevbound) ")
-          .", for ".Stringify($LaTeXML::CURRENT_TOKEN))
-        if $LaTeXML::DEBUG{modes};
+        . ($prevbound eq $prevmode ? '' : "(in $prevbound) ")
+        . ", for " . Stringify($LaTeXML::CURRENT_TOKEN))
+      if $LaTeXML::DEBUG{modes};
     my $curfont = $STATE->lookupValue('font');
     if    ($mode eq $prevbound) { }
     elsif ($ismath) {
@@ -496,7 +501,7 @@ sub beginMode {
       my $ereg  = $STATE->lookupDefinition($every);
       if (my $toks = $ereg && $ereg->isRegister && $ereg->valueOf()) {
         $self->getGullet->unread($toks); } }
-    elsif($wasmath) {
+    elsif ($wasmath) {
       # When entering text mode, we should set the font to the text font in use before the math
       # but inherit color and size
       $STATE->assignValue(font => $STATE->lookupValue('savedfont')->merge(
@@ -504,7 +509,7 @@ sub beginMode {
           size  => $curfont->getSize), 'local'); }
   }
   else {
-    Warn('unexpected',$mode,$self, "Cannot enter $mode mode"); }
+    Warn('unexpected', $umode, $self, "Cannot enter $umode mode"); }
   return; }
 
 sub endMode {
@@ -512,17 +517,17 @@ sub endMode {
   if (my $mode = $bindable_mode{$umode}) {
     if ((!$STATE->isValueBound('BOUND_MODE', 0))    # Last stack frame was NOT a mode switch!?!?!
       || ($STATE->lookupValue('BOUND_MODE') ne $mode)) {    # Or was a mode switch to a different mode
-      # Don't pop if there's an error; maybe we'll recover?
+          # Don't pop if there's an error; maybe we'll recover?
       Error('unexpected', $LaTeXML::CURRENT_TOKEN, $self, "Attempt to end mode $mode",
         currentFrameMessage($self)); }
     else {
-      leaveHorizontal_internal($self) if $mode =~ /vertical$/; # nopar version!
-      popStackFrame($self);        # Effectively egroup.
-      Debug("MODE unbind $mode, resume ".$STATE->lookupValue('MODE').", for ".Stringify($LaTeXML::CURRENT_TOKEN))
-          if $LaTeXML::DEBUG{modes};
-    }}
+      leaveHorizontal_internal($self) if $mode =~ /vertical$/;    # nopar version!
+      popStackFrame($self);                                       # Effectively egroup.
+      Debug("MODE unbind $mode, resume " . $STATE->lookupValue('MODE') . ", for " . Stringify($LaTeXML::CURRENT_TOKEN))
+        if $LaTeXML::DEBUG{modes};
+    } }
   else {
-    Warn('unexpected',$mode,$self, "Cannot end $mode mode"); }
+    Warn('unexpected', $mode, $self, "Cannot end $mode mode"); }
   return; }
 
 #**********************************************************************

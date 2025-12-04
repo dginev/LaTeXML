@@ -632,14 +632,21 @@ my %baseline_map = (
 #   vattach : top, bottom, middle (...?) affects how the height & depth are
 #      allocated when there are multiple lines.
 # Boxes that arent a Core Box, List, Whatsit or a string are IGNORED
+our $ENTRY = 0;
+
 sub computeBoxesSize {
   my ($self, $boxes, %options) = @_;
+  $ENTRY++;
+  my $TICKET = $ENTRY;
   return computeStringSize($self, $boxes) unless ref $boxes;
-  my $mode   = $boxes->getProperty('mode') || 'restricted_horizontal';
-  my $layout = ($mode eq 'horizontal' ? 'paragraph'
-    : ($mode =~ /vertical$/ ? 'vertical' : 'restricted_horizontal'));
+  Note("CBS$TICKET on BOXES: " . $boxes->stringify);
+  my $mode = $boxes->getProperty('mode') || 'restricted_horizontal';
+  Note("CBS$TICKET mode: $mode");
+  my $layout = ($mode eq 'horizontal') ? 'paragraph'
+    : (($mode =~ /vertical$/) ? 'vertical' : 'restricted_horizontal');
   # $boxes's vattach & width override any passed as options
-  my $vattach   = $boxes->getProperty('vattach') || $options{vattach} || 'baseline';
+  my $vattach = $boxes->getProperty('vattach') || $options{vattach} || 'baseline';
+  Note("CBS$TICKET layout: $layout; vattach: $vattach");
   my $wrapwidth = undef;
   if ($layout eq 'paragraph') {
     $wrapwidth = $boxes->getProperty('width') || $options{width}
@@ -649,19 +656,22 @@ sub computeBoxesSize {
   no warnings 'recursion';
   my @boxes = grep { !(ref $_) || !$_->getProperty('isEmpty') }
     grep { !(ref $_) || $_->can('getSize'); } $boxes->unlist;
+  Note("CBS$TICKET #boxes: " . scalar(@boxes));
   # ----------------------------------------------------------------------
   my @lines = ();
-  if ($layout eq 'vertical') {                               # For vertical, ALL boxes are lines
+  if ($layout eq 'vertical') {    # For vertical, ALL boxes are lines
     foreach my $box (@boxes) {
       # In TeX, a horizontal (paragraph) list would have already been typeset into
       # an internal_vertical list; inside a vertical list it should be subject to vattach
       if ((ref $box eq 'LaTeXML::Core::List')
         && (($box->getProperty('mode') || '') eq 'horizontal')) {
+        Note("CBS$TICKET in-vertical horizontal list: " . Stringify($box));
         my $width = $box->getProperty('width') || $wrapwidth;
         $width = $width->valueOf if ref $width;
         push(@lines, $self->computeBoxesSize_lines($width,
             $self->computeBoxesSize_words($box->unlist))); }
       else {
+        Note("CBS$TICKET in-vertical other box: " . Stringify($box));
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; } } }
   else {
@@ -671,8 +681,8 @@ sub computeBoxesSize {
   # ----------------------------------------------------------------------
   # Now, stack up the multiple lines
   my ($wd, $ht, $dp) = $self->computeBoxesSize_stack($vattach, @lines);
-
-  Debug("Size boxes " . join(',', map { $_ . '=' . ToString($options{$_}); } sort keys %options) . "\n"
+  ## Note("CBS$TICKET DONE #boxes: ".scalar(@boxes));
+  Debug("CBS$TICKET Size boxes " . join(',', map { $_ . '=' . ToString($options{$_}); } sort keys %options) . "\n"
       . "  Boxes: " . ToString($boxes) . "\n"
       . "  Boxes: " . Stringify($boxes) . "\n"
       . "  Sizes: " . join("\n", map { _showsize(@$_); } @lines) . "\n"
@@ -748,6 +758,8 @@ sub computeBoxesSize_words {
 # do line breaking of words into lines, according to $wrapwidth (if), or explicit breaks.
 sub computeBoxesSize_lines {
   my ($self, $wrapwidth, @words) = @_;
+  Note("computeBoxesSize_lines wrapwidth: " . (defined $wrapwidth ? $wrapwidth : 'undef'));
+  Note("computeBoxesSize_lines words: " . join('; ', map { "[" . join(',', @$_) . "]"; } @words));
   my @lines = ();
   my ($wd, $ht, $dp) = (0, 0, 0);
   foreach my $item (@words) {
@@ -794,9 +806,9 @@ sub computeBoxesSize_stack {
       my $hh = ($ht + $dp) / 2;       # half height
       my $c  = $size * $UNITY / 4;    # aiming for math axis size/4
       $ht = $hh + $c; $dp = $hh - $c; }
-    elsif ($vattach eq 'bottom') {    # align to baseline of Bottom row
+    elsif ($vattach eq 'bottom' or $vattach eq 'baseline') {    # align to baseline of Bottom row
       $ht = $ht + $dp; $dp = $lines[-1][2]; $ht -= $dp; }
-    else {                            # else align to baseline of top row
+    else {                                                      # else align to baseline of top row
       $dp = $ht + $dp; $ht = $lines[0][1]; $dp -= $ht; } }
   return ($wd, $ht, $dp); }
 

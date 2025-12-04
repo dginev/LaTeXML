@@ -130,8 +130,8 @@ DefConstructor('\documentstyle OptionalSemiverbatim SkipSpaces Semiverbatim []',
 
 # And some extra definitions from LaTeX 2.09, if we're trying to be compatible
 sub compatDefinitions {
-  DefRegister('\@maxsep'         => Dimension(0));
-  DefRegister('\@dblmaxsep'      => Dimension(0));
+  DefRegister('\@maxsep'    => Dimension(0));
+  DefRegister('\@dblmaxsep' => Dimension(0));
   return; }
 
 DefPrimitiveI('\compat@loadpackages', undef, sub {
@@ -265,7 +265,7 @@ DefConstructor('\lx@newline OptionalMatch:* [Glue]', sub {
       elsif ($document->canContain($context, 'ltx:break')) {
         $document->insertElement('ltx:break'); } } },
   reversion  => Tokens(T_CS("\\\\"), T_CR),
-  properties => { isBreak => 1 });
+  properties => { isBreak => 1, height => 0 });
 Let('\\\\', '\lx@newline');
 
 DefConstructor('\newline',
@@ -314,8 +314,9 @@ DefConstructorI(T_CS('\begin{document}'), undef, sub {
     AssignValue(current_environment => 'document');
     $_[1]->setProperty(id => Expand(T_CS('\thedocument@ID')));
     Let('\@nodocument', '\relax', 'global');
-    AssignRegister('\everypar',Tokens(), 'global');
+    AssignRegister('\everypar', Tokens(), 'global');
     my @boxes = ();
+
     if (my $ops = LookupValue('@document@preamble@atend')) {
       push(@boxes, $stomach->digest(Tokens(@$ops))); }
     if (my $ops = LookupValue('@at@begin@document')) {
@@ -1360,6 +1361,7 @@ sub beginItemize {
   my $level     = LookupValue($counter . 'level') || 0;           # level for lists of specific type
   $level++ unless $options{nolevel};
   AssignRegister('\itemsep' => LookupDimension('\lx@default@itemsep'));
+  AssignRegister('\parskip' => LookupDimension('\parsep'));
   AssignValue('itemization_level' => $listlevel);
   AssignValue($counter . 'level'  => $level);
   AssignValue(itemization_items   => 0);
@@ -1504,7 +1506,9 @@ DefConstructorI('\preitem@par', undef, sub {
     if (!$props{inPreamble} && !$document->getNodeQName($document->getElement(), 'ltx:itemize')) {
       $document->maybeCloseElement('ltx:p');
       $document->maybeCloseElement('ltx:para'); } },
-  alias => '\par');
+  afterDigest => sub { $_[0]->leaveHorizontal_internal; return; },
+  properties  => sub { (alignmentSkippable => 1, height => LookupRegister('\parsep')) },
+  alias       => '\par');
 
 # id, but NO refnum (et.al) attributes on itemize \item ...
 # unless the optional tag argument was given!
@@ -1537,20 +1541,20 @@ DefEnvironment('{itemize}',
   "<ltx:itemize xml:id='#id'>#body</ltx:itemize>",
   mode            => 'internal_vertical',
   properties      => sub { beginItemize('itemize', '@item'); },
-  beforeDigestEnd => sub { Digest('\par'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   locked          => 1);
 DefEnvironment('{enumerate}',
   "<ltx:enumerate xml:id='#id'>#body</ltx:enumerate>",
   mode            => 'internal_vertical',
   properties      => sub { beginItemize('enumerate', 'enum'); },
-  beforeDigestEnd => sub { Digest('\par'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   locked          => 1);
 DefEnvironment('{description}',
   "<ltx:description  xml:id='#id'>#body</ltx:description>",
   mode            => 'internal_vertical',
-  beforeDigest    => sub { Let('\makelabel', '\descriptionlabel'); },
+  beforeDigest    => sub { Let('\descriptionlabel', '\@mklab'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   properties      => sub { beginItemize('description', '@desc'); },
-  beforeDigestEnd => sub { Digest('\par'); },
   locked          => 1);
 
 DefMacro('\makelabel{}', '#1');
@@ -1720,7 +1724,7 @@ DefConstructor('\trivlist',
   properties => sub { beginItemize('trivlist'); });
 DefConstructor('\endtrivlist', sub {
     $_[0]->maybeCloseElement('ltx:itemize'); },
-  beforeDigest => sub { Digest('\par'); });
+  beforeDigest => sub { $_[0]->getGullet->unread(T_CS('\preitem@par')); return; });
 DefMacro('\trivlist@item', '\preitem@par\trivlist@item@');
 DefConstructor('\trivlist@item@ OptionalUndigested',
   "<ltx:item xml:id='#id' itemsep='#itemsep'>"
@@ -1728,11 +1732,11 @@ DefConstructor('\trivlist@item@ OptionalUndigested',
   properties => sub { ($_[1] ? (tag => Digest(Expand($_[1]))) : ()); });
 DefMacro('\@trivlist', '\relax', locked => 1);
 
-DefRegister('\topsep'             => Glue(0));
-DefRegister('\partopsep'          => Glue(0));
-DefRegister('\lx@default@itemsep' => Glue(0));
-DefRegister('\itemsep'            => Glue(0));
-DefRegister('\parsep'             => Glue(0));
+DefRegister('\topsep'             => Glue('8pt plus 2pt minus 4pt'));
+DefRegister('\partopsep'          => Glue('2pt plus 1pt minus 1pt'));
+DefRegister('\lx@default@itemsep' => Glue('4pt plus 2pt minus 1pt'));
+DefRegister('\itemsep'            => Glue('4pt plus 2pt minus 1pt'));
+DefRegister('\parsep'             => Glue('4pt plus 2pt minus 1pt'));
 DefRegister('\@topsep'            => Glue(0));
 DefRegister('\@topsepadd'         => Glue(0));
 DefRegister('\@outerparskip'      => Glue(0));
@@ -2246,8 +2250,8 @@ DefConditionalI('\if@in@firstcolumn', undef, sub {
 # A bit more defensiveness, since people abuse eqnarray so badly.
 # Eg. &&\lefteqn{...}  whatever?!?!
 DefMacro('\lefteqn{}',
-         '\ifx.#1.\else'        # Ignore empty!
-         .'\if@in@firstcolumn\multicolumn{3}{l}{\@ADDCLASS{ltx_eqn_lefteqn}\lx@begin@inline@math \displaystyle #1\\lx@end@inline@math\mbox{}}'
+  '\ifx.#1.\else'    # Ignore empty!
+    . '\if@in@firstcolumn\multicolumn{3}{l}{\@ADDCLASS{ltx_eqn_lefteqn}\lx@begin@inline@math \displaystyle #1\\lx@end@inline@math\mbox{}}'
     . '\else\rlap{\lx@begin@inline@math\displaystyle #1\\lx@end@inline@math}\fi\fi');
 
 # \intertext (in amsmath)
@@ -2329,7 +2333,7 @@ DefConstructor('\@@eqnarray SkipSpaces DigestedBody',
   '#1',
   beforeDigest   => sub { $_[0]->bgroup; },
   afterConstruct => sub { rearrangeEqnarray($_[0], $_[0]->getNode->lastChild); },
-  mode   => 'restricted_horizontal', enterHorizontal => 1);
+  mode           => 'restricted_horizontal', enterHorizontal => 1);
 DefPrimitiveI('\end@eqnarray', undef, sub { $_[0]->egroup; });
 
 # ========================================
@@ -2566,7 +2570,7 @@ DefPrimitiveI('\operator@font', undef, undef,
 sub isDefinableLaTeX {
   my ($cs) = @_;
   return 1 if isDefinable($cs);
-  my $prev = LookupDefinition($cs);
+  my $prev    = LookupDefinition($cs);
   my $prevloc = $prev && $prev->getLocator;
   return $prevloc && ($prevloc->getShortSource =~ /^plain/); }
 
@@ -2658,7 +2662,7 @@ DefPrimitive('\ProvideTextCommand DefToken {}[Number][]{}', sub {
 '\expandafter\ifx\csname\cf@encoding\string' . $css . '\endcsname\relax\csname?\string' . $css . '\endcsname'
           . '\else\csname\cf@encoding\string' . $css . '\endcsname\fi'); }
     my $ecs = T_CS('\\' . $encoding . $css);
-    if (!IsDefined($ecs)) {    # If not already defined...
+    if (!IsDefined($ecs)) {         # If not already defined...
       DefMacroI($ecs, convertLaTeXArgs($nargs, $opt), $expansion); }
     return; });
 
@@ -3855,7 +3859,7 @@ DefConstructor('\lx@label Semiverbatim', sub {
       AssignValue('LABEL@' . $label, DigestText(T_CS('\@currentlabel')), 'global');
       $_[0]->endMode('restricted_horizontal'); }
     return; });
-Let('\label','\lx@label');
+Let('\label', '\lx@label');
 
 # If a node has been labeled, but still  hasn't yet got an id by afterClose:late,
 # we'd better generate an id for it.
@@ -4319,7 +4323,7 @@ DefConstructorI(T_CS("\\begin{filecontents}"), "Semiverbatim",
         "%% from source `$job' on YYYY/MM/DD.",
         "%%");
       my $line;
-      $gullet->readRawLine; # discard remainder of \begin{filecontents} line!
+      $gullet->readRawLine;    # discard remainder of \begin{filecontents} line!
       while (defined($line = $gullet->readRawLine) && ($line !~ /\s*\\end\{filecontents\}/)) {
         push(@lines, $line); }
       AssignValue($filename . '_contents' => join("\n", @lines), 'global');
@@ -4337,7 +4341,7 @@ DefConstructorI(T_CS("\\begin{filecontents*}"), "Semiverbatim",
         "%% generated by the `filecontents*' environment",
         "%% from source `$job' on YYYY/MM/DD.");
       my $line;
-      $gullet->readRawLine; # discard remainder of \begin{filecontents} line!
+      $gullet->readRawLine;    # discard remainder of \begin{filecontents} line!
       while (defined($line = $gullet->readRawLine) && ($line !~ /\s*\\end\{filecontents\*\}/)) {
         push(@lines, $line); }
       AssignValue($filename . '_contents' => join("\n", @lines), 'global');
@@ -4701,7 +4705,7 @@ DefMacroI('\width',       undef, '0pt');
 DefConstructor('\mbox {}',
   "<ltx:text _noautoclose='1'>#1</ltx:text>",
   mode    => 'restricted_horizontal',
-  bounded => 1,  beforeDigest => sub { Let(T_MATH,T_CS('\lx@dollar@default')); },
+  bounded => 1, beforeDigest => sub { Let(T_MATH, T_CS('\lx@dollar@default')); },
   sizer   => '#1',
   robust  => 1);
 

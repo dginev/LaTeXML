@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?latexml searchpaths="/home/deyan/git/my-LaTeXML/t/digestion"?>
+<?latexml class="article"?>
+<?latexml package="adjustbox"?>
+<?latexml package="subcaption"?>
+<?latexml RelaxNGSchema="LaTeXML"?>
+<document xmlns="http://dlmf.nist.gov/LaTeXML">
+  <resource src="LaTeXML.css" type="text/css"/>
+  <resource src="ltx-article.css" type="text/css"/>
+  <logical-block vattach="bottom">
+    <para xml:id="p1">
+      <p vattach="bottom">Word</p>
+      <p vattach="bottom">A much longer sentence is composed of many words.</p>
+      <p vattach="bottom"><Math mode="inline" tex="\sqrt{x}^{2}" text="(square-root@(x)) ^ 2" xml:id="m1">
+          <XMath>
+            <XMApp>
+              <XMTok role="SUPERSCRIPTOP" scriptpos="post1"/>
+              <XMApp>
+                <XMTok meaning="square-root"/>
+                <XMTok font="italic" role="UNKNOWN">x</XMTok>
+              </XMApp>
+              <XMTok fontsize="70%" meaning="2" role="NUMBER">2</XMTok>
+            </XMApp>
+          </XMath>
+        </Math></p>
+      <block vattach="bottom">
+        <itemize xml:id="S0.I4">
+          <item xml:id="S0.I4.i1">
+            <tags>
+              <tag>•</tag>
+              <tag role="typerefnum">1st item</tag>
+            </tags>
+            <para xml:id="S0.I4.i1.p1">
+              <p>First item</p>
+            </para>
+          </item>
+          <item xml:id="S0.I4.i2">
+            <tags>
+              <tag>•</tag>
+              <tag role="typerefnum">2nd item</tag>
+            </tags>
+            <para xml:id="S0.I4.i2.p1">
+              <p>Second item</p>
+            </para>
+          </item>
+          <item xml:id="S0.I4.i3">
+            <tags>
+              <tag>•</tag>
+              <tag role="typerefnum">3rd item</tag>
+            </tags>
+            <para xml:id="S0.I4.i3.p1">
+              <p>Third item</p>
+            </para>
+          </item>
+        </itemize>
+      </block>
+    </para>
+  </logical-block>
+  <figure xml:id="fig2">
+    <tabular vattach="middle">
+      <tbody>
+        <tr>
+          <td align="left"><text yoffset="-12.0pt"><inline-block depth="0.0pt" height="12.0pt" width="437.0pt" xscale="1" xtranslate="0.0pt" yscale="1" ytranslate="0.0pt">
+                <p>
+<inline-logical-block vattach="bottom">
+                    <figure xml:id="fig1"/>
+                    <para xml:id="p2">
+                      <p>C</p>
+                    </para>
+                  </inline-logical-block></p>
+              </inline-block></text></td>
+        </tr>
+      </tbody>
+    </tabular>
+  </figure>
+</document>

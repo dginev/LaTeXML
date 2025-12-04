@@ -35,23 +35,23 @@ sub List {
   if ((scalar(@boxes) >= 2) && ($boxes[-2] eq 'mode')) {
     $mode = pop(@boxes); pop(@boxes); }
   else {
-    $mode = $STATE->lookupValue('MODE'); } # HOPEFULLY, mode hasn't changed by now?
-  @boxes = grep { defined $_ } @boxes;    # strip out undefs
-  # Simplify single box, IFF NOT vertical list or box IS vertical
+    $mode = $STATE->lookupValue('MODE'); }    # HOPEFULLY, mode hasn't changed by now?
+  @boxes = grep { defined $_ } @boxes; # strip out undefs
+                                       # Simplify single box, IFF NOT vertical list or box IS vertical
   if ((scalar(@boxes) == 1)
-      && (!$mode || ($mode !~ /vertical$/)
-          || (($boxes[0]->getProperty('mode')||'') =~ /vertical$/))) {
-    return $boxes[0]; }                   # Simplify!
+    && (!$mode || ($mode !~ /vertical$/)
+      || (($boxes[0]->getProperty('mode') || '') =~ /vertical$/))) {
+    return $boxes[0]; }                # Simplify!
   else {
     # Flatten horizontal lists within horizontal lists
-    if($mode eq 'horizontal'){
+    if ($mode eq 'horizontal') {
       @boxes = map { ((ref $_ eq 'LaTeXML::Core::List')
-                      && (($_->getProperty('mode')||'') eq 'horizontal')
-                      ? $_->unlist : $_); } @boxes; }
+            && (($_->getProperty('mode') || '') eq 'horizontal')
+          ? $_->unlist : $_); } @boxes; }
     my $list = LaTeXML::Core::List->new(@boxes);
-    $list->setProperty(mode => $mode);
+    $list->setProperty(mode  => $mode);
     $list->setProperty(width => LaTeXML::Package::LookupRegister('\hsize'))
-        if $mode eq 'horizontal';
+      if $mode eq 'horizontal';
     return $list; } }
 
 sub new {
@@ -90,7 +90,7 @@ sub toAttribute {
 sub stringify {
   no warnings 'recursion';
   my ($self) = @_;
-  return $self->_stringify . '[' . join(',', map { Stringify($_) } $self->unlist) . ']'; }
+  return $self->_stringify . '[' . join(',', (map { $_->stringify } @{ $$self{boxes} })) . ']'; }
 
 sub equals {
   my ($a, $b) = @_;

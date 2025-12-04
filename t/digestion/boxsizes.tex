@@ -1,0 +1,81 @@
+\documentclass{article}
+\usepackage{xcolor}
+\usepackage{adjustbox}
+\usepackage{subcaption}
+\usepackage{tcolorbox}
+\newbox\tmp
+\long\def\vboxsize#1#2{%
+\setbox\tmp=\vbox{#2}%
+\message{BOX size (#1): Width=\the\wd\tmp, Height=\the\ht\tmp, Depth=\the\dp\tmp}
+#2}
+
+\begin{document}
+
+\vboxsize{min-outer}{
+  \vboxsize{min-inner-1}{\vbox{word 1}}
+  \vboxsize{min-inner-2}{\vbox{word 2}} % then par
+  \par
+  \vboxsize{min-inner-3}{\vbox{word 3}}}
+
+\vboxsize{par}{\vboxsize{word}{Word}
+  \vboxsize{sentence}{A much longer sentence is composed of many words.}
+  \vboxsize{vmath}{$\sqrt{x}^2$}
+  \vboxsize{vitems}{
+    \begin{itemize}
+      \item First item
+      \item Second item
+      \item Third item
+    \end{itemize}}}
+
+\begin{figure}
+\vboxsize{tabular}{\begin{tabular}{l}
+  \adjustbox{valign=t}{\vboxsize{subfig}{\begin{subfigure}{2cm}B\\C\\D\end{subfigure}}}
+\end{tabular}}
+\end{figure}
+
+\def\mockenumerate{%
+\begin{enumerate}
+  \item Select a point from the restricted domain of the original function.  
+  \item Reflect it across $y=x$ to form the \textit{Inverse Function Point}.  
+  \item Solve algebraically for the inverse (which will usually produce $\pm$ roots).  
+  \item Substitute the $x$-value of the Inverse Function Point; the correct root is the one whose $y$-value matches.  
+\end{enumerate}}
+\def\mockpars{%
+\textcolor{brown}{\textbf{User:}}
+
+I have 3 pencils, 2 pens, and 4 erasers.  How many things do I have?
+
+\textcolor{brown}{\textbf{GPT-3:}}
+
+You have 9 things. \textcolor{brown}{\textbf{[correct in 3 out of 3 trials]}}
+
+\textcolor{brown}{\textbf{User:}}
+
+I have 3 chickens, 2 ducks, and 4 geese.  How many things do I have? 
+
+\textcolor{brown}{\textbf{GPT-3:}}
+
+You have 10 animals total. \textcolor{brown}{\textbf{[incorrect in 3 out of 3 trials]}}}
+
+minipage enumerate:
+\vboxsize{minipage enumerate}{%
+\begin{minipage}{\textwidth}
+\mockenumerate
+\end{minipage}}
+
+minipage pars:
+\vboxsize{minipage pars}{%
+\begin{minipage}{\textwidth}
+\mockpars
+\end{minipage}}
+
+\vboxsize{tcolorbox enumerate}{%
+\begin{tcolorbox}[colback=blue!5,colframe=blue!40!black,title=Rule: Inverse Function Point Method]
+  \mockenumerate
+\end{tcolorbox}}
+
+\vboxsize{tcolorbox pars}{%
+\begin{tcolorbox}[colback=black!5!white,colframe=black!75!black,title=GPT-3 on Counting Items]
+  \mockpars
+\end{tcolorbox}}
+\end{document}

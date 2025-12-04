@@ -4946,14 +4946,26 @@ sub picScale {
   # Vain attempt at proper type coercion
   my $type = ref $value;
   my $unit = LookupRegister('\unitlength');
-  if    (!$value) { }
+  if (!$value) {
+    if (!defined $value) {
+      # Attempt to recover to something somewhat visible if $value was wrongly undefined
+      Error('undefined', 'dimension', undef,
+        "Undefined picture dimension, treated as \\unitlength");
+      return $unit; }
+    else {    # zero scaled is zero
+      return $value; } }
   elsif ($type eq 'LaTeXML::Common::Number') {
     return $unit->multiply($value); }
   elsif ($type eq 'LaTeXML::Common::Float') {
     return $unit->multiply($value); }
-  elsif ($type eq 'LaTeXML::Common::Pair') {
-    return Pair($unit->multiply($value->getX), $unit->multiply($value->getY)); }
-  return $value->multiply($unit); }
+  elsif ($type eq 'LaTeXML::Core::Pair') {
+    return Pair(
+      $unit->multiply($value->getX),
+      $unit->multiply($value->getY)); }
+  else {
+    Error('misdefined', 'dimension', undef,
+      "Cannot scale a picture dimension of type '$type'");
+    return $value; } }
 
 sub picProperties {
   my (%props) = @_;

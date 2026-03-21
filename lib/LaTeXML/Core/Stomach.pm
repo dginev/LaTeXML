@@ -139,8 +139,11 @@ sub digest {
             $$self{gullet}->getPendingComment || $$self{gullet}->readXToken(1))) {
         push(@LaTeXML::LIST, invokeToken($self, $token));
         last if $initdepth > scalar(@{ $$self{boxing} }); }    # if we've closed the initial mode.
-      List(@LaTeXML::LIST, mode => $mode);
-    }); }
+      if (scalar(@LaTeXML::LIST) != 1) {
+        return List(@LaTeXML::LIST, mode => $mode);
+      } else {
+        return $LaTeXML::LIST[0];
+      } }); }
 
 # Invoke a token;
 # If it is a primitive or constructor, the definition will be invoked,
@@ -463,10 +466,10 @@ sub leaveHorizontal_internal {
   my $bound  = $STATE->lookupValue('BOUND_MODE');
   # This needs to be an invisible, and slightly gentler, \par (see \lx@normal@par)
   # BUT still allow user defined \par !
+  repackHorizontal($self);
   if (($mode eq 'horizontal') && ($bound =~ /vertical$/)) {
     Debug("MODE leave $mode, resuming $bound, for " . Stringify($LaTeXML::CURRENT_TOKEN))
       if $LaTeXML::DEBUG{modes};
-    repackHorizontal($self);
     $STATE->assignValue(MODE => $bound, 'inplace'); }
   return; }
 

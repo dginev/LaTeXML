@@ -41,11 +41,6 @@ DefPrimitive(T_BEGIN, sub {
     my $ismath = $STATE->lookupValue('IN_MATH');
     my $mode   = $STATE->lookupValue('MODE');
     my @body   = $stomach->digestNextBody();
-    # If text/math in vertical mode started a paragraph (entering horizontal mode),
-    # update the List mode to reflect the transition. This ensures that e.g.
-    # {\color{brown}\textbf{User:}} in vertical mode produces a horizontal List.
-    if (($mode =~ /vertical$/) && ($STATE->lookupValue('MODE') eq 'horizontal')) {
-      $mode = 'horizontal'; }
     List($open, @body, mode => $mode); });
 
 #######DefPrimitive('}', sub {
@@ -160,12 +155,7 @@ sub readBoxContents {
   while (defined($t = $gullet->getPendingComment || $gullet->readXToken(1))) {
     last if $t->defined_as(T_END) && ($level >= $STATE->getFrameDepth);
     push(@LaTeXML::LIST, $stomach->invokeToken($t)); }
-  # In vertical modes, repack any trailing horizontal material into a paragraph sub-list.
-  # This mirrors TeX's behavior where text/math in vertical mode starts a paragraph
-  # that gets packed into a horizontal line of width \hsize.
-  if ($mode =~ /vertical$/) {
-    $stomach->repackHorizontal; }
-  $stomach->endMode($mode);    # end mode, and close extra group
+  $stomach->endMode($mode);      # end mode, and close extra group
   return List(@LaTeXML::LIST, mode => $mode); }
 
 DefRegister('\everyhbox', Tokens());

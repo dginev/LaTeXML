@@ -17,6 +17,5 @@ use LaTeXML::Package;
 
 #======================================================================
 # Nothing to do here, really....
-# TODO: But we may want to revise this if/when it is used in SVG contexts.
 #======================================================================
 1;

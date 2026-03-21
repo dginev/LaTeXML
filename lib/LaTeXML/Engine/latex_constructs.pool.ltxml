@@ -316,7 +316,7 @@ DefConstructorI(T_CS('\begin{document}'), undef, sub {
     $_[1]->setProperty(id => Expand(T_CS('\thedocument@ID')));
     Let('\@nodocument', '\relax', 'global');
     AssignRegister('\everypar', Tokens(), 'global');
-    # Match real LaTeX: \columnwidth\textwidth, \hsize\columnwidth, \linewidth\columnwidth
+    # Match LaTeX's \begin{document} (ltx2e: \columnwidth\textwidth, \hsize\columnwidth)
     my $tw = LookupRegister('\textwidth');
     AssignRegister('\columnwidth' => $tw);
     AssignRegister('\hsize'       => $tw);
@@ -1560,8 +1560,8 @@ DefEnvironment('{description}',
   "<ltx:description  xml:id='#id'>#body</ltx:description>",
   mode            => 'internal_vertical',
   beforeDigest    => sub { Let('\makelabel', '\descriptionlabel'); },
-  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   properties      => sub { beginItemize('description', '@desc'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   locked          => 1);
 
 DefMacro('\makelabel{}', '#1');

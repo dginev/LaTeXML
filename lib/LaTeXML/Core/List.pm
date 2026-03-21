@@ -51,7 +51,7 @@ sub List {
           ? $_->unlist : $_); } @boxes; }
     my $list = LaTeXML::Core::List->new(@boxes);
     $list->setProperty(mode => $mode);
-    if ($mode eq 'horizontal') {
+    if ($mode eq 'horizontal') {       # Guard: \hsize may not yet be defined during early loading
       my $hsize = $STATE->lookupMeaning(T_CS('\hsize')) && LaTeXML::Package::LookupRegister('\hsize');
       $list->setProperty(width => $hsize) if $hsize; }
     return $list; } }

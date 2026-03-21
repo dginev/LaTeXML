@@ -641,7 +641,7 @@ sub computeBoxesSize {
   # $boxes's vattach & width override any passed as options
   my $vattach   = $boxes->getProperty('vattach') || $options{vattach} || 'baseline';
   my $wrapwidth = undef;
-  if ($layout eq 'paragraph') {
+  if ($layout eq 'paragraph' || $layout eq 'vertical') {
     $wrapwidth = $boxes->getProperty('width') || $options{width}
       || LaTeXML::Package::LookupRegister('\hsize');
     $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth; }    # Dimension to sp
@@ -660,19 +660,11 @@ sub computeBoxesSize {
         $width = $width->valueOf if ref $width;
         push(@lines, $self->computeBoxesSize_lines($width,
             $self->computeBoxesSize_words($box->unlist))); }
-      # Math or horizontal content directly in vertical mode should be treated as a
-      # paragraph line (width = \hsize), matching TeX's behavior where such content
-      # automatically starts a paragraph. Only apply to boxes with actual content
-      # (non-zero natural width), not paragraph markers like \preitem@par.
+      # Math or explicit hbox content in vertical mode: use natural size.
+      # Unlike paragraphs, these do NOT fill \hsize in TeX.
       elsif ((($box->getProperty('mode') || '') =~ /^(?:math|restricted_horizontal)$/)) {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
-        if ($w) {    # Has actual content width: treat as paragraph line
-          my $hsize = LaTeXML::Package::LookupRegister('\hsize');
-          $hsize = $hsize->valueOf if ref $hsize;
-          $w     = $hsize          if $hsize && $w < $hsize;
-          push(@lines, [$w, $h, $d]); }
-        elsif ($h || $d) {    # No content width but has height: vertical spacing
-          push(@lines, [0, $h, $d]); } }
+        push(@lines, [$w, $h, $d]) if $w || $h || $d; }
       else {
         # Skip invisible whatsits (like \label) that are alignmentSkippable
         # and have no explicit height — they shouldn't contribute to box sizing.

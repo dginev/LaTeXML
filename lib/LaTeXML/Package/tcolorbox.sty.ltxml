@@ -25,4 +25,9 @@ RequirePackage('xparse');
 
 InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
 
+# \tcb@use@autoparskip is defined via pgfkeys (.code handler) during package init,
+# but the handler may not execute correctly under LaTeXML.
+# Force-define the fallback so the \AtBeginDocument hook doesn't error.
+DefMacroI('\tcb@use@autoparskip', undef, '\tcb@use@auto@parskip');
+
 1;

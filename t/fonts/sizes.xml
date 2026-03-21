@@ -181,40 +181,40 @@
     <para class="ltx_noindent" xml:id="S5.p1">
       <p>Text: ‘<inline-block vattach="bottom">
           <p>hop</p>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p2">
       <p>Text: ‘<inline-block vattach="bottom">
           <p>hop</p>
-        </inline-block>’ is 16.11116pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p3">
       <p>Text: ‘<inline-block vattach="bottom">
           <p>hop</p>
           <p>hop</p>
           <p>hop</p>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p4">
       <p>Text: ‘<inline-block vattach="top">
           <p>hop</p>
           <p>hop</p>
           <p>hop</p>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p5">
       <p>Text: ‘<inline-block vattach="bottom">
           <p>hop</p>
           <p>hop</p>
           <p>hop</p>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p6">
       <p>Text: ‘<inline-block vattach="top">
           <p>hop</p>
           <p>hop</p>
           <p>hop</p>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p7">
       <p>Text: ‘<inline-block vattach="top">
@@ -228,7 +228,7 @@
             <p>hop</p>
             <p>hop</p>
           </block>
-        </inline-block>’ is 469.75499pt x 6.94444pt + 13.94444pt.</p>
+        </inline-block>’ is 345.0pt x 6.94444pt + 13.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p8">
       <p>Text: ‘<inline-block vattach="bottom">
@@ -242,7 +242,7 @@
             <p>hop</p>
             <p>hop</p>
           </block>
-        </inline-block>’ is 469.75499pt x 18.94444pt + 1.94444pt.</p>
+        </inline-block>’ is 345.0pt x 18.94444pt + 1.94444pt.</p>
     </para>
     <para class="ltx_noindent" xml:id="S5.p9">
       <p>Text: ‘<inline-block>
@@ -571,7 +571,7 @@
               <td align="center">p</td>
             </tr>
           </tbody>
-        </tabular>’ is 37.05559pt x 14.5pt + 9.5pt.</p>
+        </tabular>’ is 345.0pt x 14.5pt + 9.5pt.</p>
     </para>
   </section>
   <section inlist="toc" xml:id="S8">

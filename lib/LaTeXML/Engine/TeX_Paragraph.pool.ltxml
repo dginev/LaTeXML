@@ -246,11 +246,11 @@ DefRegister('\parshape', Number(0),
 # \tolerance              pi is the acceptable \badness of lines after hyphenation.
 # \pretolerance           pi is the acceptable \badness of lines in a paragraph before hyphenation is attempted.
 
-DefRegister('\spacefactor'          => Number(1000));
-DefRegister('\prevgraf'             => Number(0));
-DefRegister('\emergencystretch'     => Dimension(0));
-DefRegister('\hangindent'           => Dimension(0));
-DefRegister('\hsize'                => Dimension('6.5in'));
+DefRegister('\spacefactor'      => Number(1000));
+DefRegister('\prevgraf'         => Number(0));
+DefRegister('\emergencystretch' => Dimension(0));
+DefRegister('\hangindent'       => Dimension(0));
+# \hsize is defined early in TeX_Box.pool.ltxml (TeX engine primitive)
 DefRegister('\lineskip'             => Glue('1pt'));
 DefRegister('\lineskiplimit'        => Dimension(0));
 DefRegister('\parindent'            => Dimension('20pt'));

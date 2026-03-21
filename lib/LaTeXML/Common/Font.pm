@@ -636,16 +636,15 @@ sub computeBoxesSize {
   my ($self, $boxes, %options) = @_;
   return computeStringSize($self, $boxes) unless ref $boxes;
   my $mode   = $boxes->getProperty('mode') || 'restricted_horizontal';
-  my $layout = ($mode eq 'horizontal' ? 'paragraph'
-    : ($mode =~ /vertical$/ ? 'vertical' : 'restricted_horizontal'));
+  my $layout = ($mode eq 'horizontal') ? 'paragraph'
+    : (($mode =~ /vertical$/) ? 'vertical' : 'restricted_horizontal');
   # $boxes's vattach & width override any passed as options
   my $vattach   = $boxes->getProperty('vattach') || $options{vattach} || 'baseline';
   my $wrapwidth = undef;
   if ($layout eq 'paragraph') {
     $wrapwidth = $boxes->getProperty('width') || $options{width}
-      || $STATE->lookupDefinition(T_CS('\hsize'));
-    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth;      # Register or Dimension
-    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth; }    # still Dimension (Register)
+      || LaTeXML::Package::LookupRegister('\hsize');
+    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth; }    # Dimension to sp
   no warnings 'recursion';
   my @boxes = grep { !(ref $_) || !$_->getProperty('isEmpty') }
     grep { !(ref $_) || $_->can('getSize'); } $boxes->unlist;
@@ -661,6 +660,19 @@ sub computeBoxesSize {
         $width = $width->valueOf if ref $width;
         push(@lines, $self->computeBoxesSize_lines($width,
             $self->computeBoxesSize_words($box->unlist))); }
+      # Math or horizontal content directly in vertical mode should be treated as a
+      # paragraph line (width = \hsize), matching TeX's behavior where such content
+      # automatically starts a paragraph. Only apply to boxes with actual content
+      # (non-zero natural width), not paragraph markers like \preitem@par.
+      elsif ((($box->getProperty('mode') || '') =~ /^(?:math|restricted_horizontal)$/)) {
+        my ($w, $h, $d) = $self->computeBoxesSize_box($box);
+        if ($w) {    # Has actual content width: treat as paragraph line
+          my $hsize = LaTeXML::Package::LookupRegister('\hsize');
+          $hsize = $hsize->valueOf if ref $hsize;
+          $w     = $hsize          if $hsize && $w < $hsize;
+          push(@lines, [$w, $h, $d]); }
+        elsif ($h || $d) {    # No content width but has height: vertical spacing
+          push(@lines, [0, $h, $d]); } }
       else {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; } } }
@@ -766,38 +778,67 @@ sub computeBoxesSize_lines {
   return @lines; }
 
 # Sum up a stack of lines, determining w as max, and h & d according to $vattach.
+# Follows TeX's vpackage algorithm (tex.web:13161-13260) and append_to_vlist
+# (tex.web:13315-13327) for interline glue computation.
+# Lines with width=0 are treated as vertical spacing (glue), not content boxes.
 sub computeBoxesSize_stack {
   my ($self, $vattach, @lines) = @_;
   my ($wd,   $ht,      $dp)    = (0, 0, 0);
   my $nlines = scalar(@lines);
   if ($nlines == 0) {
     $wd = $ht = $dp = 0; }
-  elsif ($nlines == 1) {
+  elsif ($nlines == 1 && ($vattach eq 'bottom' || $vattach eq 'baseline')) {
+    # Single line with default vbox alignment: no adjustment needed
     ($wd, $ht, $dp) = @{ $lines[0] }; }
   else {
-    # baseline adjustment
-    my $size     = int($self->getSize || DEFSIZE() || 10);
-    my $baseline = fixpoint($baseline_map{$size} || $size * 1.2);
-    my $lineskip = $STATE->lookupDefinition(T_CS('\lineskip'))->valueOf->valueOf;
-    my @l        = @lines;
-    while (@l) {
-      my $r = shift(@l);
-      if (@l) {
-        if ($$r[2] + $l[0][1] < $baseline) {
-          $$r[2] = $baseline - $l[0][1]; }
-        else {
-          $$r[2] += $lineskip; } } }
-    $wd = max(map { $$_[0] } @lines);
-    $ht = sum(map { $$_[1] } @lines);
-    $dp = sum(map { $$_[2] } @lines);
+    # TeX interline glue parameters
+    my $size          = int($self->getSize || DEFSIZE() || 10);
+    my $baseline      = fixpoint($baseline_map{$size} || $size * 1.2);
+    my $lineskip      = LaTeXML::Package::LookupRegister('\lineskip')->valueOf;
+    my $lineskiplimit = LaTeXML::Package::LookupRegister('\lineskiplimit')->valueOf;
+    # TeX vpackage algorithm with append_to_vlist interline glue:
+    # x = natural height accumulator (top to last baseline)
+    # d = running depth in vpackage (reset to 0 after glue)
+    # prev_box_d = depth of last content box (for interline glue, persists across glue)
+    my $x          = 0;
+    my $d          = 0;
+    my $prev_box_d = undef;
+    for my $line (@lines) {
+      my ($lw, $lh, $ld) = @$line;
+      $wd = $lw if $lw > $wd;    # Track max width
+      if (!$lw) {
+        # Glue/spacing: vpackage does x += d + width(glue), d = 0
+        # Does NOT affect prev_box_d (TeX's prev_depth persists across glue)
+        $x += $d + $lh;
+        $d = 0; }
+      else {
+        # Content box: first insert interline glue if there was a previous box
+        if (defined $prev_box_d) {
+          # append_to_vlist: compute gap using prev_depth (= prev_box_d)
+          my $gap       = $baseline - $prev_box_d - $lh;
+          my $interline = ($gap >= $lineskiplimit) ? $gap : $lineskip;
+          # Insert interline glue: x += d + interline, d = 0
+          $x += $d + $interline;
+          $d = 0; }
+        # Add the box: vpackage does x += d + height(box), d = depth(box)
+        $x += $d + $lh;
+        $d          = $ld;
+        $prev_box_d = $ld; } }
+    # Default vbox: height = x (top to last baseline), depth = d (last box depth)
+    $ht = $x;
+    $dp = $d;
+    # Apply vertical attachment adjustments
     if ($vattach eq 'middle') {
-      my $hh = ($ht + $dp) / 2;       # half height
-      my $c  = $size * $UNITY / 4;    # aiming for math axis size/4
-      $ht = $hh + $c; $dp = $hh - $c; }
-    elsif ($vattach eq 'bottom') {    # align to baseline of Bottom row
-      $ht = $ht + $dp; $dp = $lines[-1][2]; $ht -= $dp; }
-    else {                            # else align to baseline of top row
-      $dp = $ht + $dp; $ht = $lines[0][1]; $dp -= $ht; } }
+      my $total = $ht + $dp;
+      my $c     = $size * $UNITY / 4;    # math axis ~ size/4
+      $ht = $total / 2 + $c;
+      $dp = $total / 2 - $c; }
+    elsif ($vattach eq 'top') {          # vtop: baseline at top
+      my $total = $ht + $dp;
+      $ht = $lines[0][1];                # Height of first box
+      $dp = $total - $ht; }
+    # else bottom/baseline: already correct (vbox default)
+  }
   return ($wd, $ht, $dp); }
 
 #======================================================================

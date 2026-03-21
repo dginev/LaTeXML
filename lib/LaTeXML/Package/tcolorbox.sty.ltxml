@@ -25,9 +25,12 @@ RequirePackage('xparse');
 
 InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
 
-# \tcb@use@autoparskip is defined via pgfkeys (.code handler) during package init,
-# but the handler may not execute correctly under LaTeXML.
-# Force-define the fallback so the \AtBeginDocument hook doesn't error.
-DefMacroI('\tcb@use@autoparskip', undef, '\tcb@use@auto@parskip');
+# \tcb@use@autoparskip should be set by pgfkeys' autoparskip/.code handler,
+# but that handler fails silently under LaTeXML. The \AtBeginDocument hook in
+# tcolorbox.sty then calls \tcb@use@autoparskip which is undefined.
+# Fix: define it as a no-op at the TeX level (suppressing the error), then
+# apply the noparskip style via our own AtBeginDocument hook.
+DefPrimitiveI('\tcb@use@autoparskip', undef, undef, scope => 'global');
+AtBeginDocument(TokenizeInternal('\tcbset{noparskip}'));
 
 1;

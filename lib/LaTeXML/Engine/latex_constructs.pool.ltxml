@@ -1559,7 +1559,7 @@ DefEnvironment('{enumerate}',
 DefEnvironment('{description}',
   "<ltx:description  xml:id='#id'>#body</ltx:description>",
   mode            => 'internal_vertical',
-  beforeDigest    => sub { Let('\descriptionlabel', '\@mklab'); },
+  beforeDigest    => sub { Let('\makelabel', '\descriptionlabel'); },
   afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   properties      => sub { beginItemize('description', '@desc'); },
   locked          => 1);

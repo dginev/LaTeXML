@@ -674,6 +674,9 @@ sub computeBoxesSize {
         elsif ($h || $d) {    # No content width but has height: vertical spacing
           push(@lines, [0, $h, $d]); } }
       else {
+        # Skip invisible whatsits (like \label) that are alignmentSkippable
+        # and have no explicit height — they shouldn't contribute to box sizing.
+        next if $box->getProperty('alignmentSkippable') && !$box->getProperty('height');
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; } } }
   else {

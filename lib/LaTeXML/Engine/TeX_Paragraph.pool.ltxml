@@ -110,10 +110,10 @@ DefConstructorI('\lx@normal@par', undef, sub {
     my $mode      = $STATE->lookupValue('MODE');
     my $bound     = $STATE->lookupValue('BOUND_MODE');
     # combine any digested horizontal material into a horizontal List
-    $stomach->repackHorizontal;
     if (($mode eq 'horizontal') && ($bound =~ /vertical$/)) {
       Debug("MODE leave $mode, resume $bound, for " . Stringify($LaTeXML::CURRENT_TOKEN))
         if $LaTeXML::DEBUG{modes};
+      $stomach->repackHorizontal;
       $STATE->assignValue(MODE => $bound, 'inplace'); }
     $STATE->assignValue(parshape           => undef);    # These are cleared by \par!
     $STATE->assignValue(interlinepenalties => undef);

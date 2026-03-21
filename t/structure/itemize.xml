@@ -96,7 +96,7 @@
       <description xml:id="S3.I1">
         <item labels="LABEL:de:one" xml:id="S3.I1.ix1">
           <tags>
-            <tag> One</tag>
+            <tag><text font="bold">One</text></tag>
             <tag role="typerefnum">item One</tag>
           </tags>
           <para xml:id="S3.I1.ix1.p1">
@@ -105,7 +105,7 @@
         </item>
         <item labels="LABEL:de:two" xml:id="S3.I1.ix2">
           <tags>
-            <tag> Two</tag>
+            <tag><text font="bold">Two</text></tag>
             <tag role="typerefnum">item Two</tag>
           </tags>
           <para xml:id="S3.I1.ix2.p1">
@@ -114,7 +114,7 @@
         </item>
         <item labels="LABEL:de:three" xml:id="S3.I1.ix3">
           <tags>
-            <tag> Three</tag>
+            <tag><text font="bold">Three</text></tag>
             <tag role="typerefnum">item Three</tag>
           </tags>
           <para xml:id="S3.I1.ix3.p1">

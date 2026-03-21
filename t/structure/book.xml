@@ -246,7 +246,7 @@
         <description xml:id="Ch1.S1.I3">
           <item xml:id="Ch1.S1.I3.ix1">
             <tags>
-              <tag><text font="bold">A thing</text></tag>
+              <tag> A thing</tag>
               <tag role="typerefnum">item A thing</tag>
             </tags>
             <para xml:id="Ch1.S1.I3.ix1.p1">
@@ -255,7 +255,7 @@
           </item>
           <item xml:id="Ch1.S1.I3.ix2">
             <tags>
-              <tag><text font="bold">Another</text></tag>
+              <tag> Another</tag>
               <tag role="typerefnum">item Another</tag>
             </tags>
             <para xml:id="Ch1.S1.I3.ix2.p1">
@@ -264,7 +264,7 @@
           </item>
           <item xml:id="Ch1.S1.I3.ix3">
             <tags>
-              <tag><text font="bold">And yet</text></tag>
+              <tag> And yet</tag>
               <tag role="typerefnum">item And yet</tag>
             </tags>
             <para xml:id="Ch1.S1.I3.ix3.p1">

@@ -1363,6 +1363,7 @@ sub beginItemize {
   my $level     = LookupValue($counter . 'level') || 0;           # level for lists of specific type
   $level++ unless $options{nolevel};
   AssignRegister('\itemsep' => LookupDimension('\lx@default@itemsep'));
+  AssignRegister('\parskip' => LookupDimension('\parsep'));
   AssignValue('itemization_level' => $listlevel);
   AssignValue($counter . 'level'  => $level);
   AssignValue(itemization_items   => 0);
@@ -1507,7 +1508,9 @@ DefConstructorI('\preitem@par', undef, sub {
     if (!$props{inPreamble} && !$document->getNodeQName($document->getElement(), 'ltx:itemize')) {
       $document->maybeCloseElement('ltx:p');
       $document->maybeCloseElement('ltx:para'); } },
-  alias => '\par');
+  afterDigest => sub { $_[0]->leaveHorizontal_internal; return; },
+  properties  => sub { (alignmentSkippable => 1, height => LookupDimension('\parsep')) },
+  alias       => '\par');
 
 # id, but NO refnum (et.al) attributes on itemize \item ...
 # unless the optional tag argument was given!
@@ -1540,20 +1543,20 @@ DefEnvironment('{itemize}',
   "<ltx:itemize xml:id='#id'>#body</ltx:itemize>",
   mode            => 'internal_vertical',
   properties      => sub { beginItemize('itemize', '@item'); },
-  beforeDigestEnd => sub { Digest('\par'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   locked          => 1);
 DefEnvironment('{enumerate}',
   "<ltx:enumerate xml:id='#id'>#body</ltx:enumerate>",
   mode            => 'internal_vertical',
   properties      => sub { beginItemize('enumerate', 'enum'); },
-  beforeDigestEnd => sub { Digest('\par'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   locked          => 1);
 DefEnvironment('{description}',
   "<ltx:description  xml:id='#id'>#body</ltx:description>",
   mode            => 'internal_vertical',
-  beforeDigest    => sub { Let('\makelabel', '\descriptionlabel'); },
+  beforeDigest    => sub { Let('\descriptionlabel', '\@mklab'); },
+  afterDigestBody => sub { $_[0]->getGullet->unread(T_CS('\par')); return; },
   properties      => sub { beginItemize('description', '@desc'); },
-  beforeDigestEnd => sub { Digest('\par'); },
   locked          => 1);
 
 DefMacro('\makelabel{}', '#1');
@@ -1723,7 +1726,7 @@ DefConstructor('\trivlist',
   properties => sub { beginItemize('trivlist'); });
 DefConstructor('\endtrivlist', sub {
     $_[0]->maybeCloseElement('ltx:itemize'); },
-  beforeDigest => sub { Digest('\par'); });
+  beforeDigest => sub { $_[0]->getGullet->unread(T_CS('\preitem@par')); return; });
 DefMacro('\trivlist@item', '\preitem@par\trivlist@item@');
 DefConstructor('\trivlist@item@ OptionalUndigested',
   "<ltx:item xml:id='#id' itemsep='#itemsep'>"

@@ -229,15 +229,15 @@ Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor 
           </list>
         </p>
         <list xml:id="S1.I3">
-          <label>A thing: </label>
+          <label> A thing</label>
           <item xml:id="S1.I3.ix1">
             <p xml:id="S1.I3.ix1.p1">with some descriptive text.</p>
           </item>
-          <label>Another: </label>
+          <label> Another</label>
           <item xml:id="S1.I3.ix2">
             <p xml:id="S1.I3.ix2.p1">Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
           </item>
-          <label>And yet: </label>
+          <label> And yet</label>
           <item xml:id="S1.I3.ix3">
             <p xml:id="S1.I3.ix3.p1">blah, blah. Moreover
 Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>

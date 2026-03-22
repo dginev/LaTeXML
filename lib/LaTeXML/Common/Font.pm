@@ -651,18 +651,37 @@ sub computeBoxesSize {
   # ----------------------------------------------------------------------
   my @lines = ();
   if ($layout eq 'vertical') {                               # For vertical, ALL boxes are lines
-    foreach my $box (@boxes) {
-      # In TeX, a horizontal (paragraph) list would have already been typeset into
-      # an internal_vertical list; inside a vertical list it should be subject to vattach
+    my @para_boxes = ();                                     # accumulator for loose paragraph content
+    for (my $i = 0 ; $i <= scalar(@boxes) ; $i++) {
+      my $box = $boxes[$i];
+      # At end of list, or when we hit a non-paragraph box, flush any accumulated paragraph content
+      my $boxmode = defined $box ? ($box->getProperty('mode') || '') : '';
+      # Paragraph content: loose horizontal/restricted_horizontal boxes (chars, spaces,
+      # inline constructs like \textbf) that would trigger \leavevmode in TeX.
+      # Excludes: horizontal Lists (already-formed paragraphs), explicit \hbox constructs
+      # (identified by content_box property), and math content.
+      my $is_para = defined $box && (ref $box ne 'LaTeXML::Core::List')
+        && ($boxmode =~ /^(?:horizontal|restricted_horizontal)$/)
+        && !$box->getProperty('content_box');
+      if (@para_boxes && !$is_para) {
+        # Wrap accumulated paragraph content at $wrapwidth, like TeX's implicit paragraph
+        push(@lines, $self->computeBoxesSize_lines($wrapwidth,
+            $self->computeBoxesSize_words(@para_boxes)));
+        @para_boxes = (); }
+      last unless defined $box;
+      # Horizontal Lists are already-formed paragraphs
       if ((ref $box eq 'LaTeXML::Core::List')
-        && (($box->getProperty('mode') || '') eq 'horizontal')) {
+        && ($boxmode eq 'horizontal')) {
         my $width = $box->getProperty('width') || $wrapwidth;
         $width = $width->valueOf if ref $width;
         push(@lines, $self->computeBoxesSize_lines($width,
             $self->computeBoxesSize_words($box->unlist))); }
-      # Math or explicit hbox content in vertical mode: use natural size.
-      # Unlike paragraphs, these do NOT fill \hsize in TeX.
-      elsif ((($box->getProperty('mode') || '') =~ /^(?:math|restricted_horizontal)$/)) {
+      # Loose horizontal/restricted_horizontal boxes: accumulate for paragraph wrapping
+      elsif ($is_para) {
+        push(@para_boxes, $box); }
+      # Explicit \hbox or math in vertical mode: use natural size
+      elsif ($boxmode eq 'math'
+        || (($boxmode eq 'restricted_horizontal') && $box->getProperty('content_box'))) {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; }
       else {

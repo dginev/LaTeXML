@@ -19,10 +19,10 @@
     <p>vmath: W=10.2014pt, H=8.14003pt, D=0.0pt</p>
   </para>
   <para xml:id="p5">
-    <p>minipage-pars: W=345.0pt, H=78.08334pt, D=73.08334pt</p>
+    <p>minipage-pars: W=345.0pt, H=25.18056pt, D=20.18056pt</p>
   </para>
   <para xml:id="p6">
-    <p>minipage-enum: W=345.0pt, H=15.91666pt, D=10.91666pt</p>
+    <p>minipage-enum: W=345.0pt, H=19.91666pt, D=14.91666pt</p>
   </para>
   <para xml:id="p7">
     <p>tcb-titled: W=345.0pt, H=40.80774pt, D=0.0pt</p>
@@ -34,6 +34,6 @@
     <p>tcb-2par: W=345.0pt, H=54.75218pt, D=0.0pt</p>
   </para>
   <para xml:id="p10">
-    <p>tcb-enum: W=345.0pt, H=112.69662pt, D=0.0pt</p>
+    <p>tcb-enum: W=345.0pt, H=144.69662pt, D=0.0pt</p>
   </para>
 </document>

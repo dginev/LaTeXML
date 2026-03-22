@@ -391,11 +391,13 @@ Tag('svg:foreignObject', autoOpen => 1, autoClose => 1,
       # Set top of FO height above current, as if baseline will line up w/outside
       $node->setAttribute(transform => 'matrix(1 0 0 -1 ' . $x->pxValue . ' ' . $y->pxValue . ')');
       $node->setAttribute(overflow  => 'visible');
-      # Store expected size for experimentation Temporary?
+      # Store expected size as CSS custom properties, using px to match SVG coordinates.
+      # SVG uses DPI=100 (1pt = 100/72.27 px) while CSS em uses 1em = font-size.
+      # Using px ensures the CSS container width matches the foreignObject SVG width.
       $document->setAttribute($node,
-        style => '--ltx-fo-width:' . $w->emValue(undef, $f) . 'em;'
-          . '--ltx-fo-height:' . $h->emValue(undef, $f) . 'em;'
-          . '--ltx-fo-depth:' . $d->emValue(undef, $f) . 'em;');
+        style => '--ltx-fo-width:' . $w->pxValue . 'px;'
+          . '--ltx-fo-height:' . $h->pxValue . 'px;'
+          . '--ltx-fo-depth:' . $d->pxValue . 'px;');
     } });
 
 sub isVAttached {

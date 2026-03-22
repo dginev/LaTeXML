@@ -23,14 +23,15 @@ DefMacro('\tcb@init@breakable', '\tcb@init@unbreakable', locked => 1);
 RequirePackage('expl3');
 RequirePackage('xparse');
 
-InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
-
 # \tcb@use@autoparskip should be set by pgfkeys' autoparskip/.code handler,
 # but that handler fails silently under LaTeXML. The \AtBeginDocument hook in
 # tcolorbox.sty then calls \tcb@use@autoparskip which is undefined.
-# Fix: define it as a no-op at the TeX level (suppressing the error), then
-# apply the noparskip style via our own AtBeginDocument hook.
+# Fix: define it as a no-op BEFORE loading tcolorbox (so the \AtBeginDocument
+# hook registered by tcolorbox.sty finds it), then apply noparskip via our own hook.
 DefPrimitiveI('\tcb@use@autoparskip', undef, undef, scope => 'global');
+
+InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
+
 AtBeginDocument(TokenizeInternal('\tcbset{noparskip}'));
 
 1;

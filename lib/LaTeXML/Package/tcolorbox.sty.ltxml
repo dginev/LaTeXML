@@ -34,4 +34,13 @@ InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
 
 AtBeginDocument(TokenizeInternal('\tcbset{noparskip}'));
 
+# \tcbline draws decorative separator lines using pgf. In TeX these are
+# zero-height drawing commands with \par\nointerlineskip wrappers, but in
+# LaTeXML the pgf SVG elements have large dimensions that inflate content height.
+# Override \tcbline to produce a simple horizontal rule with dashed styling.
+DefConstructor('\tcbline OptionalMatch:*',
+  "<ltx:text cssstyle='display:block;border-top:1px dashed currentColor;"
+    . "margin:0.6em 0;width:100%'/>",
+  sizer => sub { (Dimension(0), Dimension('0.4pt'), Dimension(0)); });
+
 1;

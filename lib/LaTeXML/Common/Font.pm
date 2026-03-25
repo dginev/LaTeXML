@@ -689,40 +689,50 @@ sub computeBoxesSize {
       # Explicit \hbox in vertical mode: use natural size, or wrap if content overflows
       elsif (($boxmode eq 'restricted_horizontal') && $box->getProperty('content_box')) {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
-        # If the hbox has an explicit width (e.g. \hbox to W from p-columns), check if
-        # the natural content width exceeds it. If so, the browser will wrap the text.
-        # Re-estimate height by wrapping content at the explicit width.
-        # Use explicit width (\hbox to W) or container wrapwidth as wrap target
+        # Extract character content from the hbox, recursively looking through
+        # nested \hbox wrappers (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
+        my $content = $box->getProperty('content_box');
+        my @cboxes  = _extract_content_boxes($content);
+        # Check if the extracted content has any visible text.
+        # Pure SVG/decorative hboxes (e.g. pgf shading gradients from tcolorbox frame
+        # drawing) contain only zero-sizer SVG elements and should contribute zero height.
+        my $has_text = 0;
+        for my $cb (@cboxes) {
+          next unless ref $cb;
+          if (ref $cb eq 'LaTeXML::Core::Box') {
+            my $s = $cb->getString;
+            if (defined $s && $s =~ /\S/) { $has_text = 1; last; } }
+          elsif ($cb->can('getWidth')) {
+            my $tw = $cb->getWidth;
+            if ($tw && ref $tw && $tw->valueOf > 0) { $has_text = 1; last; } } }
+        if (!$has_text && @cboxes) {
+          ($w, $h, $d) = (0, 0, 0); }    # decorative SVG box, skip
+            # Use explicit width (\hbox to W) or container wrapwidth as wrap target
         my $explicit_w = $box->getProperty('width');
         my $ew         = ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf'))
           ? $explicit_w->valueOf : $wrapwidth;
-        if ($ew && $ew > 0) {
-          # Extract character content from the hbox, recursively looking through
-          # nested \hbox wrappers (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
-          my $content = $box->getProperty('content_box');
-          my @cboxes  = _extract_content_boxes($content);
-          if ($ew > 0 && @cboxes) {
-            my @words     = $self->computeBoxesSize_words(@cboxes);
-            my $natural_w = 0;
-            # Words are [$space, $wd, $ht, $dp]; sum space + width for total line width
-            for my $word (@words) { $natural_w += abs($$word[0]) + $$word[1]; }
-            # For typewriter/monospace font, CSS chars are ~14% wider than TeX cmtt
-            # (cmtt: 0.525em per char, CSS monospace: ~0.6em per char).
-            # Wrap at a narrower width to simulate CSS monospace being wider.
-            my $wrap_ew = $ew;
-            foreach my $cb (@cboxes) {
-              next unless ref $cb && $cb->can('getFont');
-              my $f2 = $cb->getFont;
-              next unless $f2;
-              my $fam = $f2->getFamily;
-              next unless $fam;
-              if ($fam eq 'typewriter') {
-                $wrap_ew   = int($ew / 1.15);
-                $natural_w = int($natural_w * 1.15); }
-              last; }
-            if ($natural_w > $ew) {
-              my @wrapped = $self->computeBoxesSize_lines($wrap_ew, @words);
-              ($w, $h, $d) = $self->computeBoxesSize_stack('baseline', @wrapped); } } }
+        if ($has_text && $ew && $ew > 0 && @cboxes) {
+          my @words     = $self->computeBoxesSize_words(@cboxes);
+          my $natural_w = 0;
+          # Words are [$space, $wd, $ht, $dp]; sum space + width for total line width
+          for my $word (@words) { $natural_w += abs($$word[0]) + $$word[1]; }
+          # For typewriter/monospace font, CSS chars are ~14% wider than TeX cmtt
+          # (cmtt: 0.525em per char, CSS monospace: ~0.6em per char).
+          # Wrap at a narrower width to simulate CSS monospace being wider.
+          my $wrap_ew = $ew;
+          foreach my $cb (@cboxes) {
+            next unless ref $cb && $cb->can('getFont');
+            my $f2 = $cb->getFont;
+            next unless $f2;
+            my $fam = $f2->getFamily;
+            next unless $fam;
+            if ($fam eq 'typewriter') {
+              $wrap_ew   = int($ew / 1.15);
+              $natural_w = int($natural_w * 1.15); }
+            last; }
+          if ($natural_w > $ew) {
+            my @wrapped = $self->computeBoxesSize_lines($wrap_ew, @words);
+            ($w, $h, $d) = $self->computeBoxesSize_stack('baseline', @wrapped); } }
         push(@lines, [$w, $h, $d]) if $w || $h || $d; }
       # Display math in vertical mode: add \abovedisplayskip and \belowdisplayskip
       elsif ($boxmode eq 'display_math') {

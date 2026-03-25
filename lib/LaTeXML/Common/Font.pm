@@ -597,7 +597,13 @@ sub computeStringSize {
     my $metric = $self->getMetric($char);
     my $entry  = $$metric{sizes}{$char};
 ##    Debug("No size entry for '$char' (" . sprintf("%x", ord($char)) . ")") unless $entry;
-    my ($cw, $ch, $cd, $ci) = ($entry ? @$entry : (0.75 * $UNITY, 0.7 * $UNITY, 0.2 * $UNITY, 0));
+    # CJK and other full-width characters (U+2E80..U+9FFF, U+F900..U+FAFF, U+FE30..U+FE4F,
+    # U+20000..U+2FA1F) default to 1.0em width; others default to 0.75em.
+    my $cp        = ord($char);
+    my $fullwidth = ($cp >= 0x2E80 && $cp <= 0x9FFF) || ($cp >= 0xF900 && $cp <= 0xFAFF)
+      || ($cp >= 0xFE30 && $cp <= 0xFE4F) || ($cp >= 0x20000 && $cp <= 0x2FA1F);
+    my $default_w = $fullwidth ? 1.0 * $UNITY : 0.75 * $UNITY;
+    my ($cw, $ch, $cd, $ci) = ($entry ? @$entry : ($default_w, 0.7 * $UNITY, 0.2 * $UNITY, 0));
     $w += int($cw * $size);
     if (my $kern = $chars[0] && $$metric{kerns}{ $char . $chars[0] }) {
       $w += int($size * $kern); }
@@ -656,12 +662,13 @@ sub computeBoxesSize {
       my $box = $boxes[$i];
       # At end of list, or when we hit a non-paragraph box, flush any accumulated paragraph content
       my $boxmode = defined $box ? ($box->getProperty('mode') || '') : '';
-      # Paragraph content: loose horizontal/restricted_horizontal boxes (chars, spaces,
-      # inline constructs like \textbf) that would trigger \leavevmode in TeX.
+      # Paragraph content: loose horizontal/restricted_horizontal/math boxes (chars, spaces,
+      # inline constructs like \textbf, inline math) that would trigger \leavevmode in TeX.
       # Excludes: horizontal Lists (already-formed paragraphs), explicit \hbox constructs
-      # (identified by content_box property), and math content.
+      # (identified by content_box property), and display_math content.
       my $is_para = defined $box && (ref $box ne 'LaTeXML::Core::List')
-        && ($boxmode =~ /^(?:horizontal|restricted_horizontal)$/)
+        && (ref $box ne 'LaTeXML::Core::Alignment')
+        && ($boxmode =~ /^(?:horizontal|restricted_horizontal|math)$/)
         && !$box->getProperty('content_box');
       if (@para_boxes && !$is_para) {
         # Wrap accumulated paragraph content at $wrapwidth, like TeX's implicit paragraph
@@ -679,11 +686,34 @@ sub computeBoxesSize {
       # Loose horizontal/restricted_horizontal boxes: accumulate for paragraph wrapping
       elsif ($is_para) {
         push(@para_boxes, $box); }
-      # Explicit \hbox or math in vertical mode: use natural size
-      elsif ($boxmode eq 'math'
-        || (($boxmode eq 'restricted_horizontal') && $box->getProperty('content_box'))) {
+      # Explicit \hbox in vertical mode: use natural size, or wrap if content overflows
+      elsif (($boxmode eq 'restricted_horizontal') && $box->getProperty('content_box')) {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
+        # If the hbox has an explicit width (e.g. \hbox to W from p-columns), check if
+        # the natural content width exceeds it. If so, the browser will wrap the text.
+        # Re-estimate height by wrapping content at the explicit width.
+        my $explicit_w = $box->getProperty('width');
+        if ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf')) {
+          my $ew      = $explicit_w->valueOf;
+          my $content = $box->getProperty('content_box');
+          my @cboxes  = (ref $content && $content->can('unlist')) ? $content->unlist : ();
+          if ($ew > 0 && @cboxes) {
+            my @words     = $self->computeBoxesSize_words(@cboxes);
+            my $natural_w = 0;
+            # Words are [$space, $wd, $ht, $dp]; sum space + width for total line width
+            for my $word (@words) { $natural_w += abs($$word[0]) + $$word[1]; }
+            if ($natural_w > $ew) {
+              my @wrapped = $self->computeBoxesSize_lines($ew, @words);
+              ($w, $h, $d) = $self->computeBoxesSize_stack('baseline', @wrapped); } } }
         push(@lines, [$w, $h, $d]) if $w || $h || $d; }
+      # Display math in vertical mode: add \abovedisplayskip and \belowdisplayskip
+      elsif ($boxmode eq 'display_math') {
+        my $above = LaTeXML::Package::LookupRegister('\abovedisplayskip')->valueOf;
+        my $below = LaTeXML::Package::LookupRegister('\belowdisplayskip')->valueOf;
+        push(@lines, [0, $above, 0]) if $above;
+        my ($w, $h, $d) = $self->computeBoxesSize_box($box);
+        push(@lines, [$w, $h, $d]) if $w || $h || $d;
+        push(@lines, [0, $below, 0]) if $below; }
       else {
         # Skip invisible whatsits (like \label) that are alignmentSkippable
         # and have no explicit height — they shouldn't contribute to box sizing.
@@ -695,8 +725,18 @@ sub computeBoxesSize {
     my @words = $self->computeBoxesSize_words(@boxes);
     @lines = $self->computeBoxesSize_lines($wrapwidth, @words); }
   # ----------------------------------------------------------------------
+  # For vertical layouts, determine the content font size for baseline skip.
+  # The container font ($self) may differ from the content font (e.g. \footnotesize
+  # inside a \vbox changes content font but not the container's font).
+  my $stack_font = $self;
+  if ($layout eq 'vertical' && scalar(@boxes)) {
+    for my $box (reverse @boxes) {
+      if (ref $box && $box->can('getFont') && (my $f = $box->getFont)) {
+        if (my $s = $f->getSize) {
+          $stack_font = $f;
+          last; } } } }
   # Now, stack up the multiple lines
-  my ($wd, $ht, $dp) = $self->computeBoxesSize_stack($vattach, @lines);
+  my ($wd, $ht, $dp) = $stack_font->computeBoxesSize_stack($vattach, @lines);
 
   Debug("Size boxes " . join(',', map { $_ . '=' . ToString($options{$_}); } sort keys %options) . "\n"
       . "  Boxes: " . ToString($boxes) . "\n"
@@ -788,7 +828,10 @@ sub computeBoxesSize_lines {
       $wd += $space + $w;
       $ht = max($ht, $h);
       $dp = max($dp, $d); } }
-  push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd || $ht || $dp;
+  # Only use wrapwidth for lines with actual text content ($wd > 0).
+  # Zero-width lines (e.g. vertical spacing from \preitem@par with height=\parsep)
+  # should keep width=0 so they're treated as glue in computeBoxesSize_stack.
+  push(@lines, [($wd ? ($wrapwidth || $wd) : 0), $ht, $dp]) if $wd || $ht || $dp;
   return @lines; }
 
 # Sum up a stack of lines, determining w as max, and h & d according to $vattach.

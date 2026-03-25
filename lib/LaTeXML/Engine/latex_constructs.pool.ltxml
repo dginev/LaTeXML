@@ -292,10 +292,10 @@ DefMacro('\@icentercr[]', '\vskip #1\ignorespaces');
 #    text
 #   \end{document}
 
-DefMacro('\AtBeginDocument{}', sub {
-    PushValue('@at@begin@document', $_[1]->unlist); });
-DefMacro('\AtEndDocument{}', sub {
-    PushValue('@at@end@document', $_[1]->unlist); });
+DefMacro('\AtBeginDocument[]{}', sub {
+    PushValue('@at@begin@document', $_[2]->unlist); });
+DefMacro('\AtEndDocument[]{}', sub {
+    PushValue('@at@end@document', $_[2]->unlist); });
 
 # Like  "<ltx:document xml:id='#id'>#body</ltx:document>",
 # But more complicated due to id, at begin/end document and so forth.
@@ -3429,7 +3429,16 @@ Tag('ltx:table',  afterClose => sub { BuildPanelsAndID(@_, 'tab'); });
 # These may need to float up to where they're allowed,
 # or they may need to close <p> or similar.
 DefConstructor('\@@caption{}', "^^<ltx:caption>#1</ltx:caption>",
-  sizer => 0, mode => 'restricted_horizontal',
+  sizer => sub {
+    my ($whatsit) = @_;
+    my $props = $whatsit->getPropertiesRef;
+    my ($w, $h, $d) = $$props{font}->computeBoxesSize($whatsit->getArg(1),
+      width => LaTeXML::Package::LookupRegister('\hsize'));
+    # Add one baseline skip to account for "Table N:" tag prefix and spacing
+    my $baseline = Dimension('12pt');
+    $h = $h->add($baseline);
+    return ($w, $h, $d); },
+  mode => 'vertical',
 );
 DefConstructor('\@@toccaption{}', "^^<ltx:toccaption>#1</ltx:toccaption>",
   sizer => 0, mode => 'restricted_horizontal',
@@ -4814,12 +4823,38 @@ DefConstructor('\lx@parbox[][Dimension] OptionalUndigested {Dimension} VBoxConte
       vattach => $props{vattach},
       class   => 'ltx_parbox');
     return; },
-  alias      => '\parbox',
-  sizer      => '#5',
+  alias => '\parbox',
+  sizer => sub {
+    my ($whatsit) = @_;
+    my $props = $whatsit->getPropertiesRef;
+    # Compute content size from body (arg #5)
+    my ($w, $h, $d) = $$props{font}->computeBoxesSize(
+      $whatsit->getArg(5),
+      vattach => ($$props{vattach} || 'baseline'),
+      width   => $$props{width});
+    # If an explicit height was requested (arg #2), use the max of requested
+    # and content total height. In TeX the box is set to the requested height
+    # and content overflows; here we ensure the container is never smaller than
+    # the content (important for SVG foreignObject sizing).
+    my $requested = $$props{requested_height};
+    if ($requested) {
+      my $content_total = $h->add($d);
+      my $total         = ($requested->valueOf > $content_total->valueOf) ? $requested : $content_total;
+      my $vattach       = $$props{vattach} || 'baseline';
+      if ($vattach eq 'top') {
+        # vtop: height = first line height (h), depth = total - h
+        $d = $total->subtract($h); }
+      elsif ($vattach eq 'middle') {
+        my $half = Dimension($total->valueOf / 2);
+        $h = $half;
+        $d = $half; }
+      else {    # bottom/baseline: height = total - d, depth = last depth (d)
+        $h = $total->subtract($d); } }
+    return ($w, $h, $d); },
   properties => sub {
     (width => $_[4],
-      vattach => translateAttachment($_[1]),
-      height  => $_[2]); },
+      vattach          => translateAttachment($_[1]),
+      requested_height => $_[2]); },
   mode         => 'internal_vertical',
   robust       => 1,
   beforeDigest => sub {

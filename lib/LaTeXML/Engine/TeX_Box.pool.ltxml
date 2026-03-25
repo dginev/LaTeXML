@@ -338,6 +338,14 @@ DefConstructor('\hbox BoxSpecification HBoxContents', sub {
     my $spec = $whatsit->getArg(1);
     my $box  = $whatsit->getArg(2);
     if (my $w = GetKeyVal($spec, 'to')) {
+      # Clamp to available width if wider: prevents overfull hbox overflow in HTML,
+      # where content wraps within its container rather than overflowing.
+      # Subtract 2*\tabcolsep to leave room for adjacent columns in tabulars.
+      my $hsize = LookupRegister('\hsize');
+      if ($hsize && $w->valueOf > $hsize->valueOf && $hsize->valueOf > 0) {
+        my $tabcolsep = LookupRegister('\tabcolsep');
+        my $avail     = $hsize->subtract($tabcolsep->multiply(2));
+        $w = ($avail->valueOf > 0) ? $avail : $hsize; }
       $whatsit->setWidth($w); }
     elsif (my $s = GetKeyVal($spec, 'spread')) {
       $whatsit->setWidth($box->getWidth->add($s)); }
@@ -386,18 +394,37 @@ Tag('svg:foreignObject', autoOpen => 1, autoClose => 1,
           . " => H=" . $H->pxValue . " @ y=" . $y->pxValue
           . " for Whatsit=" . ToString($whatsit)) if $LaTeXML::DEBUG{svg_verbose};
       # Size of FO is width and total height (+ depth)
-      $node->setAttribute(width  => $W->pxValue) unless $node->hasAttribute('width');
-      $node->setAttribute(height => $H->pxValue) unless $node->hasAttribute('height');
+      # Always set width/height from computed size (overriding any em-based values
+      # that may have been set by insertBlock, which use wrong units for SVG).
+      $node->setAttribute(width  => $W->pxValue);
+      $node->setAttribute(height => $H->pxValue);
       # Set top of FO height above current, as if baseline will line up w/outside
       $node->setAttribute(transform => 'matrix(1 0 0 -1 ' . $x->pxValue . ' ' . $y->pxValue . ')');
       $node->setAttribute(overflow  => 'visible');
       # Store expected size as CSS custom properties, using px to match SVG coordinates.
       # SVG uses DPI=100 (1pt = 100/72.27 px) while CSS em uses 1em = font-size.
-      # Using px ensures the CSS container width matches the foreignObject SVG width.
+      # Set font-size in px so that em-based widths in CSS content resolve correctly
+      # relative to the SVG coordinate system (browser default 16px != LaTeXML's 10pt).
+      my $fontsize_pt  = $f ? ($f->getSize || 10) : 10;
+      my $fontsize_dim = Dimension($fontsize_pt . 'pt');
       $document->setAttribute($node,
-        style => '--ltx-fo-width:' . $w->pxValue . 'px;'
+        style => 'font-size:' . $fontsize_dim->pxValue . 'px;'
+          . '--ltx-fo-width:' . $w->pxValue . 'px;'
           . '--ltx-fo-height:' . $h->pxValue . 'px;'
           . '--ltx-fo-depth:' . $d->pxValue . 'px;');
+      # Convert pt-based width attributes in descendants to em, so they scale
+      # with the foreignObject font-size and match SVG coordinates.
+      # Also convert <ltx:caption>/<ltx:toccaption> to <ltx:p> so they remain
+      # inside the foreignObject (the XSLT would otherwise extract them).
+      foreach my $desc ($node->getElementsByTagName('*')) {
+        my $wa = $desc->getAttribute('width');
+        if ($wa && $wa =~ /^([\d.]+)pt$/) {
+          $desc->setAttribute('width', sprintf("%.2f", $1 / $fontsize_pt) . 'em'); }
+        my $tag = $document->getNodeQName($desc) || '';
+        if ($tag eq 'ltx:caption') {
+          $document->renameNode($desc, 'ltx:p'); }
+        elsif ($tag eq 'ltx:toccaption') {
+          $document->removeNode($desc); } }
     } });
 
 sub isVAttached {

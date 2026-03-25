@@ -17,12 +17,12 @@
             <svg:path d="M 1.97 5.91 L 1.97 305.67 L 475.41 305.67 L 475.41 5.91 C 475.41 3.73 473.65 1.97 471.47 1.97 L 5.91 1.97 C 3.73 1.97 1.97 3.73 1.97 5.91 Z" style="stroke:none"/>
           </svg:g>
           <svg:g fill-opacity="1.0" transform="matrix(1.0 0.0 0.0 1.0 21.65 311.58)">
-            <svg:foreignObject color="#FFFFFF" height="9.61" overflow="visible" style="font-size:13.84px;--ltx-fo-width:434.07px;--ltx-fo-height:9.61px;--ltx-fo-depth:0px;" transform="matrix(1 0 0 -1 0 9.61)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
+            <svg:foreignObject color="#FFFFFF" height="9.61" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:9.61px;--ltx-fo-depth:0px;" transform="matrix(1 0 0 -1 0 9.61)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
                 <p>Box 1: Mathematical model of diverse misinformation</p>
               </inline-block></svg:foreignObject>
           </svg:g>
           <svg:g fill-opacity="1.0" transform="matrix(1.0 0.0 0.0 1.0 21.65 13.78)">
-            <svg:foreignObject color="#000000" height="280.08" overflow="visible" style="font-size:13.84px;--ltx-fo-width:434.07px;--ltx-fo-height:280.08px;--ltx-fo-depth:0px;" transform="matrix(1 0 0 -1 0 280.08)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
+            <svg:foreignObject color="#000000" height="280.08" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:280.08px;--ltx-fo-depth:0px;" transform="matrix(1 0 0 -1 0 280.08)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
                 <p>We wish to explore the potential impacts of our results on the spread of diverse misinformation on social networks. We consider that multiple independent streams of misinformation spread simultaneously.</p>
                 <p>We account for the above using three stylized patterns for the network structure. First, we divide the network into two demographic classes of equal size, simply labeled 1 and 2.</p>
                 <p>According to the above, we can write the fraction of nodes <Math mode="inline" tex="p^{1}_{k,\ell}" text="(p ^ 1) _ (list@(k, ell))" xml:id="p1.pic1.m1">

@@ -465,7 +465,12 @@ sub insertBlock {
     $context     = $document->openElement('ltx:XMText');
     $context_tag = $document->getNodeQName($context); }
   if (my $w = $is_svg && $blockattr{width}) {
-    $blockattr{width} = $w->emValue(undef, $contents->getFont) . "em" if ref $w; }
+    # Convert to em using the document base font-size (matching the foreignObject's
+    # font-size setting), not the content's local font-size. CSS em resolves relative
+    # to the element's own font-size, which inherits from the foreignObject.
+    if (ref $w) {
+      my $basefontsize = LookupValue('DOCUMENT_BASE_FONTSIZE') || 10;
+      $blockattr{width} = sprintf("%.2f", $w->ptValue / $basefontsize) . "em"; } }
   my $inline    = $is_svg || $document->canContain($context_tag, '#PCDATA');
   my $container = $document->openElement('ltx:_CaptureBlock_', %blockattr);
   $document->absorb($contents);

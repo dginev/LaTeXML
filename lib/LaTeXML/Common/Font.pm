@@ -626,7 +626,7 @@ sub getNominalSize {
 # Nominal baseline size for a given font size
 # This really should be tracked within the TeX
 my %baseline_map = (
-  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 10, 10 => 12,
+  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 11, 10 => 12,
   11 => 13.6, 12 => 14, 14.4 => 18, 17 => 22,  20 => 25, 25 => 30);
 
 # Here's where I avoid trying to emulate Knuth's line-breaking...
@@ -771,6 +771,11 @@ sub computeBoxesSize_box {
 sub computeBoxesSize_words {
   no warnings 'recursion';
   my ($self, @boxes) = @_;
+  # Flatten inline whatsits (\emph, \textbf, \color, etc.) so their character
+  # content participates in word-level breaking. Without this, an entire
+  # \emph{long text with spaces} is treated as one indivisible "word",
+  # preventing accurate line-wrapping estimation and underestimating height.
+  @boxes = _flatten_inline_boxes(@boxes);
   my @words = ();
   my $prevbox;
   my $prevspace = 0;
@@ -810,6 +815,42 @@ sub computeBoxesSize_words {
   if ($wd || $ht || $dp || $prevspace) {    # be sure to get last bit
     push(@words, [$prevspace, $wd, $ht, $dp]); }
   return @words; }
+
+# Recursively flatten inline whatsits (restricted_horizontal mode) into their
+# constituent character boxes. This allows spaces inside \emph{}, \textbf{},
+# \color{}{} etc. to act as word-break points for line-wrapping estimation.
+# Without flattening, \emph{long phrase with spaces} is one opaque "word" of
+# ~200pt that can't be broken, causing underestimated line counts.
+sub _flatten_inline_boxes {
+  no warnings 'recursion';
+  my @result = ();
+  for my $box (@_) {
+    my $dominated = 0;
+    if (ref $box && ref $box ne 'LaTeXML::Core::Box') {
+      my $mode = (ref $box && $box->can('getProperty')) ? ($box->getProperty('mode') || '') : '';
+      if ($mode eq 'restricted_horizontal'
+        && !$box->getProperty('content_box')
+        && !$box->getProperty('isBreak')
+        && !$box->getProperty('isSpace')) {
+        # For Whatsits: extract content from body property or arguments
+        my @children;
+        if (ref $box eq 'LaTeXML::Core::Whatsit') {
+          my $body = $box->getProperty('body');
+          if ($body) {
+            @children = $body->unlist; }
+          else {
+            # Extract content from arguments, keeping only Box-like objects
+            @children = map { (ref $_ && $_->can('unlist')) ? $_->unlist : () }
+              grep { defined $_ && ref $_ && $_->can('isaBox') && $_->isaBox }
+              $box->getArgs; } }
+        elsif ($box->can('unlist')) {
+          @children = $box->unlist; }
+        # Only flatten if we got actual children different from the box itself
+        if (@children && !(scalar(@children) == 1 && $children[0] == $box)) {
+          push(@result, _flatten_inline_boxes(@children));
+          $dominated = 1; } } }
+    push(@result, $box) unless $dominated; }
+  return @result; }
 
 # do line breaking of words into lines, according to $wrapwidth (if), or explicit breaks.
 sub computeBoxesSize_lines {

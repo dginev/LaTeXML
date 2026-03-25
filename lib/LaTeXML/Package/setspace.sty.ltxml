@@ -26,7 +26,13 @@ DefEnvironment("{onehalfspace}", "#body");
 DefEnvironment("{doublespace}",  "#body");
 DefEnvironment("{spacing}{}",    "#body");
 
-DefMacroI('\setstretch',            '{}',  '');
+# \setstretch stores the stretch factor so sizing can account for it.
+DefPrimitive('\setstretch{}', sub {
+    my ($stomach, $factor) = @_;
+    my $f = ToString($factor);
+    if ($f && $f =~ /^[\d.]+$/ && $f > 0) {
+      AssignValue('SETSTRETCH_FACTOR' => $f, 'global'); }
+    return; });
 DefMacroI('\SetSinglespace',        '{}',  '');
 DefMacroI('\setdisplayskipstretch', '{}',  '');
 DefMacroI('\restore@spacing',       undef, '');

@@ -849,8 +849,12 @@ sub computeBoxesSize_stack {
     ($wd, $ht, $dp) = @{ $lines[0] }; }
   else {
     # TeX interline glue parameters
-    my $size          = int($self->getSize || DEFSIZE() || 10);
-    my $baseline      = fixpoint($baseline_map{$size} || $size * 1.2);
+    my $size     = int($self->getSize || DEFSIZE() || 10);
+    my $baseline = fixpoint($baseline_map{$size} || $size * 1.2);
+    # Account for \setstretch factor from setspace package
+    my $stretch = $STATE->lookupValue('SETSTRETCH_FACTOR');
+    if ($stretch && $stretch =~ /^[\d.]+$/ && $stretch > 1) {
+      $baseline = fixpoint(($baseline / $UNITY) * $stretch); }
     my $lineskip      = LaTeXML::Package::LookupRegister('\lineskip')->valueOf;
     my $lineskiplimit = LaTeXML::Package::LookupRegister('\lineskiplimit')->valueOf;
     # TeX vpackage algorithm with append_to_vlist interline glue:

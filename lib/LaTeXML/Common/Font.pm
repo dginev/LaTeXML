@@ -694,9 +694,11 @@ sub computeBoxesSize {
         # Re-estimate height by wrapping content at the explicit width.
         my $explicit_w = $box->getProperty('width');
         if ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf')) {
-          my $ew      = $explicit_w->valueOf;
+          my $ew = $explicit_w->valueOf;
+          # Extract character content from the hbox, recursively looking through
+          # nested \hbox wrappers (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
           my $content = $box->getProperty('content_box');
-          my @cboxes  = (ref $content && $content->can('unlist')) ? $content->unlist : ();
+          my @cboxes  = _extract_content_boxes($content);
           if ($ew > 0 && @cboxes) {
             my @words     = $self->computeBoxesSize_words(@cboxes);
             my $natural_w = 0;
@@ -815,6 +817,23 @@ sub computeBoxesSize_words {
   if ($wd || $ht || $dp || $prevspace) {    # be sure to get last bit
     push(@words, [$prevspace, $wd, $ht, $dp]); }
   return @words; }
+
+# Recursively extract character-level boxes from nested \hbox wrappers.
+# Follows content_box properties and unlists through Lists to find the
+# actual text content (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
+sub _extract_content_boxes {
+  no warnings 'recursion';
+  my ($content) = @_;
+  return () unless $content && ref $content;
+  my @items = $content->can('unlist') ? $content->unlist : ($content);
+  my @result;
+  for my $item (@items) {
+    if (ref $item && $item->can('getProperty') && $item->getProperty('content_box')) {
+      # Nested \hbox with content_box — recurse into its content
+      push(@result, _extract_content_boxes($item->getProperty('content_box'))); }
+    else {
+      push(@result, $item); } }
+  return _flatten_inline_boxes(@result); }
 
 # Recursively flatten inline whatsits (restricted_horizontal mode) into their
 # constituent character boxes. This allows spaces inside \emph{}, \textbf{},

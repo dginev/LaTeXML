@@ -704,8 +704,22 @@ sub computeBoxesSize {
             my $natural_w = 0;
             # Words are [$space, $wd, $ht, $dp]; sum space + width for total line width
             for my $word (@words) { $natural_w += abs($$word[0]) + $$word[1]; }
+            # For typewriter/monospace font, CSS chars are ~14% wider than TeX cmtt
+            # (cmtt: 0.525em per char, CSS monospace: ~0.6em per char).
+            # Wrap at a narrower width to simulate CSS monospace being wider.
+            my $wrap_ew = $ew;
+            foreach my $cb (@cboxes) {
+              next unless ref $cb && $cb->can('getFont');
+              my $f2 = $cb->getFont;
+              next unless $f2;
+              my $fam = $f2->getFamily;
+              next unless $fam;
+              if ($fam eq 'typewriter') {
+                $wrap_ew   = int($ew / 1.15);
+                $natural_w = int($natural_w * 1.15); }
+              last; }
             if ($natural_w > $ew) {
-              my @wrapped = $self->computeBoxesSize_lines($ew, @words);
+              my @wrapped = $self->computeBoxesSize_lines($wrap_ew, @words);
               ($w, $h, $d) = $self->computeBoxesSize_stack('baseline', @wrapped); } } }
         push(@lines, [$w, $h, $d]) if $w || $h || $d; }
       # Display math in vertical mode: add \abovedisplayskip and \belowdisplayskip

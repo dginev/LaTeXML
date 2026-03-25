@@ -692,9 +692,11 @@ sub computeBoxesSize {
         # If the hbox has an explicit width (e.g. \hbox to W from p-columns), check if
         # the natural content width exceeds it. If so, the browser will wrap the text.
         # Re-estimate height by wrapping content at the explicit width.
+        # Use explicit width (\hbox to W) or container wrapwidth as wrap target
         my $explicit_w = $box->getProperty('width');
-        if ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf')) {
-          my $ew = $explicit_w->valueOf;
+        my $ew         = ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf'))
+          ? $explicit_w->valueOf : $wrapwidth;
+        if ($ew && $ew > 0) {
           # Extract character content from the hbox, recursively looking through
           # nested \hbox wrappers (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
           my $content = $box->getProperty('content_box');

@@ -905,7 +905,12 @@ sub computeBoxesSize_lines {
   foreach my $item (@words) {
     my ($space, $w, $h, $d) = @$item;
     if ($space == -1) {
-      push(@lines, [$wd, $ht, $dp]) if $wd;
+      # Push current line (if non-empty) or an empty line for consecutive breaks (\\\\)
+      if ($wd || $ht || $dp) {
+        push(@lines, [$wd, $ht, $dp]); }
+      elsif (@lines) {    # consecutive break: add empty line with baseline height
+        my $size = int($self->getSize || 10);
+        push(@lines, [0, fixpoint($size * 0.7), fixpoint($size * 0.3)]); }
       $wd = $w; $ht = $h; $dp = $d; }
     elsif ((defined $wrapwidth) && ($wd + $space * 0.5 + $w > $wrapwidth)) {
       push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd;

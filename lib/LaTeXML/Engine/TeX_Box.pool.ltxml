@@ -407,24 +407,31 @@ Tag('svg:foreignObject', autoOpen => 1, autoClose => 1,
       # relative to the SVG coordinate system (browser default 16px != LaTeXML's 10pt).
       my $fontsize_pt  = $f ? ($f->getSize || 10) : 10;
       my $fontsize_dim = Dimension($fontsize_pt . 'pt');
-      $document->setAttribute($node,
-        style => 'font-size:' . $fontsize_dim->pxValue . 'px;'
-          . '--ltx-fo-width:' . $w->pxValue . 'px;'
-          . '--ltx-fo-height:' . $h->pxValue . 'px;'
-          . '--ltx-fo-depth:' . $d->pxValue . 'px;');
+      my $fontsize_px  = $fontsize_dim->pxValue;
       # Convert pt-based width attributes in descendants to em, so they scale
       # with the foreignObject font-size and match SVG coordinates.
-      # Also convert <ltx:caption>/<ltx:toccaption> to <ltx:p> so they remain
-      # inside the foreignObject (the XSLT would otherwise extract them).
+      # Also find the content element's em-based width (set by insertBlock) for
+      # --ltx-fo-width, and convert captions to paragraphs.
+      my $content_width_em;
       foreach my $desc ($node->getElementsByTagName('*')) {
         my $wa = $desc->getAttribute('width');
         if ($wa && $wa =~ /^([\d.]+)pt$/) {
           $desc->setAttribute('width', sprintf("%.2f", $1 / $fontsize_pt) . 'em'); }
+        elsif (!$content_width_em && $wa && $wa =~ /^[\d.]+em$/) {
+          $content_width_em = $wa; }
         my $tag = $document->getNodeQName($desc) || '';
         if ($tag eq 'ltx:caption') {
           $document->renameNode($desc, 'ltx:p'); }
         elsif ($tag eq 'ltx:toccaption') {
           $document->removeNode($desc); } }
+      # Set CSS custom properties. Use content element's em width (from insertBlock)
+      # for --ltx-fo-width so it matches the minipage/parbox CSS width exactly.
+      my $fo_width = $content_width_em || ($w->emValue(undef, $f) . 'em');
+      $document->setAttribute($node,
+        style => 'font-size:' . $fontsize_px . 'px;'
+          . '--ltx-fo-width:' . $fo_width . ';'
+          . '--ltx-fo-height:' . $h->pxValue . 'px;'
+          . '--ltx-fo-depth:' . $d->pxValue . 'px;');
     } });
 
 sub isVAttached {

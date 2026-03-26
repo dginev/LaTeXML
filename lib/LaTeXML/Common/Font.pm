@@ -597,13 +597,7 @@ sub computeStringSize {
     my $metric = $self->getMetric($char);
     my $entry  = $$metric{sizes}{$char};
 ##    Debug("No size entry for '$char' (" . sprintf("%x", ord($char)) . ")") unless $entry;
-    # CJK and other full-width characters (U+2E80..U+9FFF, U+F900..U+FAFF, U+FE30..U+FE4F,
-    # U+20000..U+2FA1F) default to 1.0em width; others default to 0.75em.
-    my $cp        = ord($char);
-    my $fullwidth = ($cp >= 0x2E80 && $cp <= 0x9FFF) || ($cp >= 0xF900 && $cp <= 0xFAFF)
-      || ($cp >= 0xFE30 && $cp <= 0xFE4F) || ($cp >= 0x20000 && $cp <= 0x2FA1F);
-    my $default_w = $fullwidth ? 1.0 * $UNITY : 0.75 * $UNITY;
-    my ($cw, $ch, $cd, $ci) = ($entry ? @$entry : ($default_w, 0.7 * $UNITY, 0.2 * $UNITY, 0));
+    my ($cw, $ch, $cd, $ci) = ($entry ? @$entry : (0.75 * $UNITY, 0.7 * $UNITY, 0.2 * $UNITY, 0));
     $w += int($cw * $size);
     if (my $kern = $chars[0] && $$metric{kerns}{ $char . $chars[0] }) {
       $w += int($size * $kern); }
@@ -626,7 +620,7 @@ sub getNominalSize {
 # Nominal baseline size for a given font size
 # This really should be tracked within the TeX
 my %baseline_map = (
-  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 11, 10 => 12,
+  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 10, 10 => 12,
   11 => 13.6, 12 => 14, 14.4 => 18, 17 => 22,  20 => 25, 25 => 30);
 
 # Here's where I avoid trying to emulate Knuth's line-breaking...
@@ -642,110 +636,32 @@ sub computeBoxesSize {
   my ($self, $boxes, %options) = @_;
   return computeStringSize($self, $boxes) unless ref $boxes;
   my $mode   = $boxes->getProperty('mode') || 'restricted_horizontal';
-  my $layout = ($mode eq 'horizontal') ? 'paragraph'
-    : (($mode =~ /vertical$/) ? 'vertical' : 'restricted_horizontal');
+  my $layout = ($mode eq 'horizontal' ? 'paragraph'
+    : ($mode =~ /vertical$/ ? 'vertical' : 'restricted_horizontal'));
   # $boxes's vattach & width override any passed as options
   my $vattach   = $boxes->getProperty('vattach') || $options{vattach} || 'baseline';
   my $wrapwidth = undef;
-  if ($layout eq 'paragraph' || $layout eq 'vertical') {
+  if ($layout eq 'paragraph') {
     $wrapwidth = $boxes->getProperty('width') || $options{width}
-      || LaTeXML::Package::LookupRegister('\hsize');
-    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth; }    # Dimension to sp
+      || $STATE->lookupDefinition(T_CS('\hsize'));
+    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth;      # Register or Dimension
+    $wrapwidth = $wrapwidth->valueOf if ref $wrapwidth; }    # still Dimension (Register)
   no warnings 'recursion';
   my @boxes = grep { !(ref $_) || !$_->getProperty('isEmpty') }
     grep { !(ref $_) || $_->can('getSize'); } $boxes->unlist;
   # ----------------------------------------------------------------------
   my @lines = ();
   if ($layout eq 'vertical') {                               # For vertical, ALL boxes are lines
-    my @para_boxes = ();                                     # accumulator for loose paragraph content
-    for (my $i = 0 ; $i <= scalar(@boxes) ; $i++) {
-      my $box = $boxes[$i];
-      # At end of list, or when we hit a non-paragraph box, flush any accumulated paragraph content
-      my $boxmode = defined $box ? ($box->getProperty('mode') || '') : '';
-      # Paragraph content: loose horizontal/restricted_horizontal/math boxes (chars, spaces,
-      # inline constructs like \textbf, inline math) that would trigger \leavevmode in TeX.
-      # Excludes: horizontal Lists (already-formed paragraphs), explicit \hbox constructs
-      # (identified by content_box property), and display_math content.
-      my $is_para = defined $box && (ref $box ne 'LaTeXML::Core::List')
-        && (ref $box ne 'LaTeXML::Core::Alignment')
-        && ($boxmode =~ /^(?:horizontal|restricted_horizontal|math)$/)
-        && !$box->getProperty('content_box');
-      if (@para_boxes && !$is_para) {
-        # Wrap accumulated paragraph content at $wrapwidth, like TeX's implicit paragraph
-        push(@lines, $self->computeBoxesSize_lines($wrapwidth,
-            $self->computeBoxesSize_words(@para_boxes)));
-        @para_boxes = (); }
-      last unless defined $box;
-      # Horizontal Lists are already-formed paragraphs
+    foreach my $box (@boxes) {
+      # In TeX, a horizontal (paragraph) list would have already been typeset into
+      # an internal_vertical list; inside a vertical list it should be subject to vattach
       if ((ref $box eq 'LaTeXML::Core::List')
-        && ($boxmode eq 'horizontal')) {
+        && (($box->getProperty('mode') || '') eq 'horizontal')) {
         my $width = $box->getProperty('width') || $wrapwidth;
         $width = $width->valueOf if ref $width;
         push(@lines, $self->computeBoxesSize_lines($width,
             $self->computeBoxesSize_words($box->unlist))); }
-      # Loose horizontal/restricted_horizontal boxes: accumulate for paragraph wrapping
-      elsif ($is_para) {
-        push(@para_boxes, $box); }
-      # Explicit \hbox in vertical mode: use natural size, or wrap if content overflows
-      elsif (($boxmode eq 'restricted_horizontal') && $box->getProperty('content_box')) {
-        my ($w, $h, $d) = $self->computeBoxesSize_box($box);
-        # Extract character content from the hbox, recursively looking through
-        # nested \hbox wrappers (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
-        my $content = $box->getProperty('content_box');
-        my @cboxes  = _extract_content_boxes($content);
-        # Check if the extracted content has any visible text.
-        # Pure SVG/decorative hboxes (e.g. pgf shading gradients from tcolorbox frame
-        # drawing) contain only zero-sizer SVG elements and should contribute zero height.
-        my $has_text = 0;
-        for my $cb (@cboxes) {
-          next unless ref $cb;
-          if (ref $cb eq 'LaTeXML::Core::Box') {
-            my $s = $cb->getString;
-            if (defined $s && $s =~ /\S/) { $has_text = 1; last; } }
-          elsif ($cb->can('getWidth')) {
-            my $tw = $cb->getWidth;
-            if ($tw && ref $tw && $tw->valueOf > 0) { $has_text = 1; last; } } }
-        if (!$has_text && @cboxes) {
-          ($w, $h, $d) = (0, 0, 0); }    # decorative SVG box, skip
-            # Use explicit width (\hbox to W) or container wrapwidth as wrap target
-        my $explicit_w = $box->getProperty('width');
-        my $ew         = ($explicit_w && (ref $explicit_w) && $explicit_w->can('valueOf'))
-          ? $explicit_w->valueOf : $wrapwidth;
-        if ($has_text && $ew && $ew > 0 && @cboxes) {
-          my @words     = $self->computeBoxesSize_words(@cboxes);
-          my $natural_w = 0;
-          # Words are [$space, $wd, $ht, $dp]; sum space + width for total line width
-          for my $word (@words) { $natural_w += abs($$word[0]) + $$word[1]; }
-          # For typewriter/monospace font, CSS chars are ~14% wider than TeX cmtt
-          # (cmtt: 0.525em per char, CSS monospace: ~0.6em per char).
-          # Wrap at a narrower width to simulate CSS monospace being wider.
-          my $wrap_ew = $ew;
-          foreach my $cb (@cboxes) {
-            next unless ref $cb && $cb->can('getFont');
-            my $f2 = $cb->getFont;
-            next unless $f2;
-            my $fam = $f2->getFamily;
-            next unless $fam;
-            if ($fam eq 'typewriter') {
-              $wrap_ew   = int($ew / 1.15);
-              $natural_w = int($natural_w * 1.15); }
-            last; }
-          if ($natural_w > $ew) {
-            my @wrapped = $self->computeBoxesSize_lines($wrap_ew, @words);
-            ($w, $h, $d) = $self->computeBoxesSize_stack('baseline', @wrapped); } }
-        push(@lines, [$w, $h, $d]) if $w || $h || $d; }
-      # Display math in vertical mode: add \abovedisplayskip and \belowdisplayskip
-      elsif ($boxmode eq 'display_math') {
-        my $above = LaTeXML::Package::LookupRegister('\abovedisplayskip')->valueOf;
-        my $below = LaTeXML::Package::LookupRegister('\belowdisplayskip')->valueOf;
-        push(@lines, [0, $above, 0]) if $above;
-        my ($w, $h, $d) = $self->computeBoxesSize_box($box);
-        push(@lines, [$w, $h, $d]) if $w || $h || $d;
-        push(@lines, [0, $below, 0]) if $below; }
       else {
-        # Skip invisible whatsits (like \label) that are alignmentSkippable
-        # and have no explicit height — they shouldn't contribute to box sizing.
-        next if $box->getProperty('alignmentSkippable') && !$box->getProperty('height');
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; } } }
   else {
@@ -753,18 +669,8 @@ sub computeBoxesSize {
     my @words = $self->computeBoxesSize_words(@boxes);
     @lines = $self->computeBoxesSize_lines($wrapwidth, @words); }
   # ----------------------------------------------------------------------
-  # For vertical layouts, determine the content font size for baseline skip.
-  # The container font ($self) may differ from the content font (e.g. \footnotesize
-  # inside a \vbox changes content font but not the container's font).
-  my $stack_font = $self;
-  if ($layout eq 'vertical' && scalar(@boxes)) {
-    for my $box (reverse @boxes) {
-      if (ref $box && $box->can('getFont') && (my $f = $box->getFont)) {
-        if (my $s = $f->getSize) {
-          $stack_font = $f;
-          last; } } } }
   # Now, stack up the multiple lines
-  my ($wd, $ht, $dp) = $stack_font->computeBoxesSize_stack($vattach, @lines);
+  my ($wd, $ht, $dp) = $self->computeBoxesSize_stack($vattach, @lines);
 
   Debug("Size boxes " . join(',', map { $_ . '=' . ToString($options{$_}); } sort keys %options) . "\n"
       . "  Boxes: " . ToString($boxes) . "\n"
@@ -799,11 +705,6 @@ sub computeBoxesSize_box {
 sub computeBoxesSize_words {
   no warnings 'recursion';
   my ($self, @boxes) = @_;
-  # Flatten inline whatsits (\emph, \textbf, \color, etc.) so their character
-  # content participates in word-level breaking. Without this, an entire
-  # \emph{long text with spaces} is treated as one indivisible "word",
-  # preventing accurate line-wrapping estimation and underestimating height.
-  @boxes = _flatten_inline_boxes(@boxes);
   my @words = ();
   my $prevbox;
   my $prevspace = 0;
@@ -844,59 +745,6 @@ sub computeBoxesSize_words {
     push(@words, [$prevspace, $wd, $ht, $dp]); }
   return @words; }
 
-# Recursively extract character-level boxes from nested \hbox wrappers.
-# Follows content_box properties and unlists through Lists to find the
-# actual text content (e.g. Verbatim: \hbox to W{\kern\hbox to W{text\hss}\hss}).
-sub _extract_content_boxes {
-  no warnings 'recursion';
-  my ($content) = @_;
-  return () unless $content && ref $content;
-  my @items = $content->can('unlist') ? $content->unlist : ($content);
-  my @result;
-  for my $item (@items) {
-    if (ref $item && $item->can('getProperty') && $item->getProperty('content_box')) {
-      # Nested \hbox with content_box — recurse into its content
-      push(@result, _extract_content_boxes($item->getProperty('content_box'))); }
-    else {
-      push(@result, $item); } }
-  return _flatten_inline_boxes(@result); }
-
-# Recursively flatten inline whatsits (restricted_horizontal mode) into their
-# constituent character boxes. This allows spaces inside \emph{}, \textbf{},
-# \color{}{} etc. to act as word-break points for line-wrapping estimation.
-# Without flattening, \emph{long phrase with spaces} is one opaque "word" of
-# ~200pt that can't be broken, causing underestimated line counts.
-sub _flatten_inline_boxes {
-  no warnings 'recursion';
-  my @result = ();
-  for my $box (@_) {
-    my $dominated = 0;
-    if (ref $box && ref $box ne 'LaTeXML::Core::Box') {
-      my $mode = (ref $box && $box->can('getProperty')) ? ($box->getProperty('mode') || '') : '';
-      if ($mode eq 'restricted_horizontal'
-        && !$box->getProperty('content_box')
-        && !$box->getProperty('isBreak')
-        && !$box->getProperty('isSpace')) {
-        # For Whatsits: extract content from body property or arguments
-        my @children;
-        if (ref $box eq 'LaTeXML::Core::Whatsit') {
-          my $body = $box->getProperty('body');
-          if ($body) {
-            @children = $body->unlist; }
-          else {
-            # Extract content from arguments, keeping only Box-like objects
-            @children = map { (ref $_ && $_->can('unlist')) ? $_->unlist : () }
-              grep { defined $_ && ref $_ && $_->can('isaBox') && $_->isaBox }
-              $box->getArgs; } }
-        elsif ($box->can('unlist')) {
-          @children = $box->unlist; }
-        # Only flatten if we got actual children different from the box itself
-        if (@children && !(scalar(@children) == 1 && $children[0] == $box)) {
-          push(@result, _flatten_inline_boxes(@children));
-          $dominated = 1; } } }
-    push(@result, $box) unless $dominated; }
-  return @result; }
-
 # do line breaking of words into lines, according to $wrapwidth (if), or explicit breaks.
 sub computeBoxesSize_lines {
   my ($self, $wrapwidth, @words) = @_;
@@ -905,12 +753,7 @@ sub computeBoxesSize_lines {
   foreach my $item (@words) {
     my ($space, $w, $h, $d) = @$item;
     if ($space == -1) {
-      # Push current line (if non-empty) or an empty line for consecutive breaks (\\\\)
-      if ($wd || $ht || $dp) {
-        push(@lines, [$wd, $ht, $dp]); }
-      elsif (@lines) {    # consecutive break: add empty line with baseline height
-        my $size = int($self->getSize || 10);
-        push(@lines, [0, fixpoint($size * 0.7), fixpoint($size * 0.3)]); }
+      push(@lines, [$wd, $ht, $dp]) if $wd;
       $wd = $w; $ht = $h; $dp = $d; }
     elsif ((defined $wrapwidth) && ($wd + $space * 0.5 + $w > $wrapwidth)) {
       push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd;
@@ -919,78 +762,42 @@ sub computeBoxesSize_lines {
       $wd += $space + $w;
       $ht = max($ht, $h);
       $dp = max($dp, $d); } }
-  # Only use wrapwidth for lines with actual text content ($wd > 0).
-  # Zero-width lines (e.g. vertical spacing from \preitem@par with height=\parsep)
-  # should keep width=0 so they're treated as glue in computeBoxesSize_stack.
-  push(@lines, [($wd ? ($wrapwidth || $wd) : 0), $ht, $dp]) if $wd || $ht || $dp;
+  push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd || $ht || $dp;
   return @lines; }
 
 # Sum up a stack of lines, determining w as max, and h & d according to $vattach.
-# Follows TeX's vpackage algorithm (tex.web:13161-13260) and append_to_vlist
-# (tex.web:13315-13327) for interline glue computation.
-# Lines with width=0 are treated as vertical spacing (glue), not content boxes.
 sub computeBoxesSize_stack {
   my ($self, $vattach, @lines) = @_;
   my ($wd,   $ht,      $dp)    = (0, 0, 0);
   my $nlines = scalar(@lines);
   if ($nlines == 0) {
     $wd = $ht = $dp = 0; }
-  elsif ($nlines == 1 && ($vattach eq 'bottom' || $vattach eq 'baseline')) {
-    # Single line with default vbox alignment: no adjustment needed
+  elsif ($nlines == 1) {
     ($wd, $ht, $dp) = @{ $lines[0] }; }
   else {
-    # TeX interline glue parameters
+    # baseline adjustment
     my $size     = int($self->getSize || DEFSIZE() || 10);
     my $baseline = fixpoint($baseline_map{$size} || $size * 1.2);
-    # Account for \setstretch factor from setspace package
-    my $stretch = $STATE->lookupValue('SETSTRETCH_FACTOR');
-    if ($stretch && $stretch =~ /^[\d.]+$/ && $stretch > 1) {
-      $baseline = fixpoint(($baseline / $UNITY) * $stretch); }
-    my $lineskip      = LaTeXML::Package::LookupRegister('\lineskip')->valueOf;
-    my $lineskiplimit = LaTeXML::Package::LookupRegister('\lineskiplimit')->valueOf;
-    # TeX vpackage algorithm with append_to_vlist interline glue:
-    # x = natural height accumulator (top to last baseline)
-    # d = running depth in vpackage (reset to 0 after glue)
-    # prev_box_d = depth of last content box (for interline glue, persists across glue)
-    my $x          = 0;
-    my $d          = 0;
-    my $prev_box_d = undef;
-    for my $line (@lines) {
-      my ($lw, $lh, $ld) = @$line;
-      $wd = $lw if $lw > $wd;    # Track max width
-      if (!$lw) {
-        # Glue/spacing: vpackage does x += d + width(glue), d = 0
-        # Does NOT affect prev_box_d (TeX's prev_depth persists across glue)
-        $x += $d + $lh;
-        $d = 0; }
-      else {
-        # Content box: first insert interline glue if there was a previous box
-        if (defined $prev_box_d) {
-          # append_to_vlist: compute gap using prev_depth (= prev_box_d)
-          my $gap       = $baseline - $prev_box_d - $lh;
-          my $interline = ($gap >= $lineskiplimit) ? $gap : $lineskip;
-          # Insert interline glue: x += d + interline, d = 0
-          $x += $d + $interline;
-          $d = 0; }
-        # Add the box: vpackage does x += d + height(box), d = depth(box)
-        $x += $d + $lh;
-        $d          = $ld;
-        $prev_box_d = $ld; } }
-    # Default vbox: height = x (top to last baseline), depth = d (last box depth)
-    $ht = $x;
-    $dp = $d;
-    # Apply vertical attachment adjustments
+    my $lineskip = $STATE->lookupDefinition(T_CS('\lineskip'))->valueOf->valueOf;
+    my @l        = @lines;
+    while (@l) {
+      my $r = shift(@l);
+      if (@l) {
+        if ($$r[2] + $l[0][1] < $baseline) {
+          $$r[2] = $baseline - $l[0][1]; }
+        else {
+          $$r[2] += $lineskip; } } }
+    $wd = max(map { $$_[0] } @lines);
+    $ht = sum(map { $$_[1] } @lines);
+    $dp = sum(map { $$_[2] } @lines);
     if ($vattach eq 'middle') {
-      my $total = $ht + $dp;
-      my $c     = $size * $UNITY / 4;    # math axis ~ size/4
-      $ht = $total / 2 + $c;
-      $dp = $total / 2 - $c; }
-    elsif ($vattach eq 'top') {          # vtop: baseline at top
-      my $total = $ht + $dp;
-      $ht = $lines[0][1];                # Height of first box
-      $dp = $total - $ht; }
-    # else bottom/baseline: already correct (vbox default)
-  }
+      my $hh = ($ht + $dp) / 2;       # half height
+      my $c  = $size * $UNITY / 4;    # aiming for math axis size/4
+      $ht = $hh + $c; $dp = $hh - $c; }
+    elsif ($vattach eq 'bottom') {    # align to baseline of Bottom row
+      $ht = $ht + $dp; $dp = $lines[-1][2]; $ht -= $dp; }
+    else {                            # else align to baseline of top row
+      $dp = $ht + $dp; $ht = $lines[0][1]; $dp -= $ht; } }
   return ($wd, $ht, $dp); }
 
 #======================================================================

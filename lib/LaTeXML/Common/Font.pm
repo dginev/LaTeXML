@@ -659,8 +659,13 @@ sub computeBoxesSize {
         && (($box->getProperty('mode') || '') eq 'horizontal')) {
         my $width = $box->getProperty('width') || $wrapwidth;
         $width = $width->valueOf if ref $width;
-        push(@lines, $self->computeBoxesSize_lines($width,
-            $self->computeBoxesSize_words($box->unlist))); }
+        # Carry the per-paragraph \baselineskip captured during repackHorizontal
+        my $bs     = $box->getProperty('baselineskip');
+        my @plines = $self->computeBoxesSize_lines($width,
+          $self->computeBoxesSize_words($box->unlist));
+        if ($bs) {    # annotate lines with their source paragraph's baselineskip
+          $$_[3] = $bs for @plines; }
+        push(@lines, @plines); }
       else {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
         push(@lines, [$w, $h, $d]) if $w || $h || $d; } } }
@@ -775,10 +780,14 @@ sub computeBoxesSize_stack {
   elsif ($nlines == 1) {
     ($wd, $ht, $dp) = @{ $lines[0] }; }
   else {
-    # baseline adjustment
+    # baseline adjustment: in TeX, \baselineskip glue is inserted between lines
+    # so that baselines are \baselineskip apart (or \lineskip if boxes overlap).
+    # Lines may carry a per-line baselineskip ($$line[3]) captured at \par time
+    # via repackHorizontal; this faithfully reflects font changes like \small
+    # and \setstretch that were active when the paragraph was built.
     my $size     = int($self->getSize || DEFSIZE() || 10);
     my $baseline = fixpoint($baseline_map{$size} || $size * 1.2);
-    # Apply \setstretch factor if active (e.g. from setspace package)
+    # Apply \setstretch factor as a global fallback for lines without stored baselineskip
     my $stretch = $STATE->lookupValue('SETSTRETCH_FACTOR');
     if ($stretch && $stretch > 0 && $stretch != 1) {
       $baseline = int($baseline * $stretch); }
@@ -789,8 +798,9 @@ sub computeBoxesSize_stack {
     while (@l) {
       my $r = shift(@l);
       if (@l) {
-        if ($$r[2] + $l[0][1] < $baseline) {
-          $$r[2] = $baseline - $l[0][1]; }
+        my $bs = $$r[3] || $baseline;    # per-line baselineskip or global fallback
+        if ($$r[2] + $l[0][1] < $bs) {
+          $$r[2] = $bs - $l[0][1]; }
         else {
           $$r[2] += $lineskip; } } }
     $wd = max(map { $$_[0] } @lines);

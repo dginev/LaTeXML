@@ -620,7 +620,7 @@ sub getNominalSize {
 # Nominal baseline size for a given font size
 # This really should be tracked within the TeX
 my %baseline_map = (
-  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 10, 10 => 12,
+  5  => 6,    6  => 7,  7    => 8,  8  => 9.5, 9  => 11, 10 => 12,
   11 => 13.6, 12 => 14, 14.4 => 18, 17 => 22,  20 => 25, 25 => 30);
 
 # Here's where I avoid trying to emulate Knuth's line-breaking...
@@ -778,6 +778,12 @@ sub computeBoxesSize_stack {
     # baseline adjustment
     my $size     = int($self->getSize || DEFSIZE() || 10);
     my $baseline = fixpoint($baseline_map{$size} || $size * 1.2);
+    # Apply \setstretch factor if active (e.g. from setspace package)
+    my $stretch = $STATE->lookupValue('SETSTRETCH_FACTOR');
+    if ($stretch && $stretch > 0 && $stretch != 1) {
+      $baseline = int($baseline * $stretch); }
+    Debug("SIZE_STACK: size=$size baseline=$baseline nlines=$nlines"
+        . ($stretch ? " stretch=$stretch" : "")) if $LaTeXML::DEBUG{'size-detailed'};
     my $lineskip = $STATE->lookupDefinition(T_CS('\lineskip'))->valueOf->valueOf;
     my @l        = @lines;
     while (@l) {

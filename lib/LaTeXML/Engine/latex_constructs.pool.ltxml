@@ -1947,7 +1947,7 @@ DefConstructorI('\lx@begin@display@math', undef,
     . "</ltx:Math>"
     . "</ltx:equation>",
   reversion    => Tokens(T_MATH, T_MATH),
-  beforeDigest => sub { $_[0]->beginMode('display_math'); },
+  beforeDigest => sub { $_[0]->leaveHorizontal; $_[0]->beginMode('display_math'); },
   properties   => sub { RefStepID('equation') },
   captureBody  => 1);
 
@@ -1959,9 +1959,10 @@ DefEnvironment('{displaymath}',
     . "</ltx:XMath>"
     . "</ltx:Math>"
     . "</ltx:equation>",
-  mode       => 'display_math',
-  properties => sub { RefStepID('equation') },
-  locked     => 1);
+  mode            => 'display_math',
+  leaveHorizontal => 1,
+  properties      => sub { RefStepID('equation') },
+  locked          => 1);
 DefEnvironment('{math}',
   "<ltx:Math mode='inline'>"
     . "<ltx:XMath>"
@@ -2106,8 +2107,9 @@ DefEnvironment('{equation}',
     . "</ltx:XMath>"
     . "</ltx:Math>"
     . "</ltx:equation>",
-  mode         => 'display_math',
-  beforeDigest => sub {
+  mode            => 'display_math',
+  leaveHorizontal => 1,
+  beforeDigest    => sub {
     prepareEquationCounter(numbered => 1, preset => 1);
     beforeEquation(); },
   afterDigestBody => sub {
@@ -2124,8 +2126,9 @@ DefEnvironment('{equation*}',
     . "</ltx:XMath>"
     . "</ltx:Math>"
     . "</ltx:equation>",
-  mode         => 'display_math',
-  beforeDigest => sub {
+  mode            => 'display_math',
+  leaveHorizontal => 1,
+  beforeDigest    => sub {
     prepareEquationCounter(numbered => undef, preset => 1);
     beforeEquation(); },
   afterDigestBody => sub {

@@ -250,7 +250,14 @@ But : <text class="ltx_number">1,234</text> vs.  <text class="ltx_number">1,234
         <p><text class="ltx_number">1,234</text> vs.  <text class="ltx_number">+1,234</text>;
 And : <text class="ltx_number">1,234×10<sup>4</sup></text> vs.  <text class="ltx_number">1,234×10<sup>+4</sup></text>;</p>
       </para>
-    </paragraph>
+<!--  %% Test is not so portable across versions of numprint 
+     %“paragraph–Rounding numbers˝ 
+     %–“npnoround 
+     %$“numprint–1.123˝$; $“numprint–1.149˝$; 
+     %$“numprint–1˝$; $“numprint–9.999˝$; $“numprint–-9.999˝$˝ 
+     %–“nprounddigits–2˝ 
+     %$“numprint–1.123˝$; $“numprint–1.149˝$; 
+     %$“numprint–1˝$; $“numprint–9.999˝$; $“numprint–-9.999˝$ ˝ -->    </paragraph>
     <paragraph inlist="toc" xml:id="S2.SS0.SSS0.Px4">
       <title>Padding</title>
       <para xml:id="S2.SS0.SSS0.Px4.p1">
@@ -472,7 +479,8 @@ vs.
       <para xml:id="S2.SS0.SSS0.Px8.p1">
         <p><text class="ltx_number">-123,456</text>; <text class="ltx_number">3.141,592,7×10<sup>-32</sup></text></p>
       </para>
-      <para xml:id="S2.SS0.SSS0.Px8.p2">
+<!--  %pdflatex error: undefined control sequence “ndecimalsign 
+     %%%–“ndecimalsign -->      <para xml:id="S2.SS0.SSS0.Px8.p2">
         <p><Math mode="inline" tex="\cdot" text="cdot" xml:id="S2.SS0.SSS0.Px8.p2.m1">
             <XMath>
               <XMTok name="cdot" role="MULOP">⋅</XMTok>
@@ -819,7 +827,9 @@ vs.
         </thead>
         <tbody>
           <tr>
-            <td align="char:." border="t" thead="row">error</td>
+            <td align="char:." border="t" thead="row"><!--  %pdflatex error: char for exponent used more than once 
+     %%%abc def 12,3e3 rt&amp; 
+     %**** numprints.tex Line 125 **** -->error</td>
             <td align="char:." border="t">abc def <Math mode="inline" tex="\numprint{12,3e3}" text="12,3e3" xml:id="S3.p4.m1">
                 <XMath>
                   <XMDual>
@@ -949,7 +959,7 @@ vs.
                 <XMath>
                   <XMDual>
                     <XMTok font="italic" meaning="45,1" role="NUMBER">45,1</XMTok>
-                    <XMText rpadding="28.7pt"><text align="right" width="10.0pt"><Math mode="inline" tex="\textstyle 45" text="45" xml:id="S3.p4.m7.m1">
+                    <XMText rpadding="64.2pt"><text align="right" width="10.0pt"><Math mode="inline" tex="\textstyle 45" text="45" xml:id="S3.p4.m7.m1">
                           <XMath>
                             <XMTok meaning="45" role="NUMBER">45</XMTok>
                           </XMath>
@@ -1011,7 +1021,7 @@ vs.
                 <XMath>
                   <XMDual>
                     <XMTok color="#0000FF" font="italic" meaning="45,1" role="NUMBER">45,1</XMTok>
-                    <XMText rpadding="28.7pt"><text align="right" color="#0000FF" width="10.0pt"><Math mode="inline" tex="\textstyle 45" text="45" xml:id="S3.p4.m11.m1">
+                    <XMText rpadding="64.2pt"><text align="right" color="#0000FF" width="10.0pt"><Math mode="inline" tex="\textstyle 45" text="45" xml:id="S3.p4.m11.m1">
                           <XMath>
                             <XMTok meaning="45" role="NUMBER">45</XMTok>
                           </XMath>

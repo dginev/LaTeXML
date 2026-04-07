@@ -32,6 +32,36 @@ DefPrimitiveI('\tcb@use@autoparskip', undef, undef, scope => 'global');
 
 InputDefinitions('tcolorbox', type => 'sty', noltxml => 1);
 
+# Override \tcb@ch@equalheight to work in a single pass.
+# The original reads \tcb@ehg@height@<group> from the aux file (2nd pass),
+# falling back to the current box's natural height on the 1st pass.
+# Our override reads \tcb@ehg@current@<group> (the running max accumulated
+# during the current pass) so that boxes processed after the tallest one
+# inherit the correct group height without needing a second pass.
+RawTeX(<<'EoTeX');
+\def\tcb@ch@equalheight{%
+  \tcbdimto\tcb@ehg@currentheight{\tcb@natheight-\tcb@space}%
+  \tcb@ehgadd{\tcb@ehg@currentheight}%
+  % Use the running max from the current pass (works for single-pass LaTeXML)
+  \ifcsdef{tcb@ehg@current@\tcb@ehgid}{%
+    \letcs{\tcb@height}{tcb@ehg@current@\tcb@ehgid}%
+    \ifdim\tcb@height<\tcb@ehg@currentheight\relax%
+      \let\tcb@height\tcb@ehg@currentheight%
+    \fi%
+  }{%
+    \let\tcb@height\tcb@ehg@currentheight%
+  }%
+  % Also check the aux file value (if available from a previous run)
+  \ifcsdef{tcb@ehg@height@\tcb@ehgid}{%
+    \ifdim\csuse{tcb@ehg@height@\tcb@ehgid}>\tcb@height\relax%
+      \letcs{\tcb@height}{tcb@ehg@height@\tcb@ehgid}%
+    \fi%
+  }{}%
+  \tcbdimto\tcbheightspace{\tcb@height-\tcb@natheight}%
+  \iftcb@lowerspace\tcb@ch@fixed@both\else\tcb@ch@fixed@upper\fi%
+}
+EoTeX
+
 AtBeginDocument(TokenizeInternal('\tcbset{noparskip}'));
 
 # \tcbline draws decorative separator lines using pgf. In TeX these are

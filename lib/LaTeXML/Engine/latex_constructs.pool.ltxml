@@ -4711,7 +4711,9 @@ DefPrimitive('\hspace  OptionalMatch:* {Dimension}', sub {
       width => $length, isSpace => 1); });
 
 DefMacro('\vspace OptionalMatch:* {}', '\vskip #2\relax');
-DefPrimitive('\addvspace {}',  undef);
+# \addvspace adds vertical space in vertical mode. In TeX it merges with
+# preceding space (using the max). Implement via \vskip for measurable spacing.
+DefMacro('\addvspace {}', '\vskip #1\relax');
 DefPrimitive('\addpenalty {}', undef);
 DefPrimitiveI('\@endparenv');
 

@@ -21,10 +21,18 @@ DefMacroI('\singlespacing',  undef, '');
 DefMacroI('\onehalfspacing', undef, '');
 DefMacroI('\doublespacing',  undef, '');
 
-DefEnvironment("{singlespace}",  "#body");
-DefEnvironment("{onehalfspace}", "#body");
-DefEnvironment("{doublespace}",  "#body");
-DefEnvironment("{spacing}{}",    "#body");
+DefEnvironment("{singlespace}", "#body",
+  beforeDigest => sub { $_[0]->leaveHorizontal; },
+  mode         => 'internal_vertical');
+DefEnvironment("{onehalfspace}", "#body",
+  beforeDigest => sub { $_[0]->leaveHorizontal; },
+  mode         => 'internal_vertical');
+DefEnvironment("{doublespace}", "#body",
+  beforeDigest => sub { $_[0]->leaveHorizontal; },
+  mode         => 'internal_vertical');
+DefEnvironment("{spacing}{}", "#body",
+  beforeDigest => sub { $_[0]->leaveHorizontal; },
+  mode         => 'internal_vertical');
 
 # \setstretch stores the stretch factor and updates \baselineskip.
 # In real TeX, \setstretch sets \baselinestretch and calls \selectfont,

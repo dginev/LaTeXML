@@ -340,7 +340,8 @@ DefConstructor('\hbox BoxSpecification HBoxContents', sub {
     if (my $w = GetKeyVal($spec, 'to')) {
       # Clamp to available width if wider: prevents overfull hbox overflow in HTML,
       # where content wraps within its container rather than overflowing.
-      # Subtract 2*\tabcolsep to leave room for adjacent columns in tabulars.
+      # Subtract 2*\tabcolsep to leave room for cell padding in tabulars
+      # (small constant, harmless outside tabulars).
       my $hsize = LookupRegister('\hsize');
       if ($hsize && $w->valueOf > $hsize->valueOf && $hsize->valueOf > 0) {
         my $tabcolsep = LookupRegister('\tabcolsep');

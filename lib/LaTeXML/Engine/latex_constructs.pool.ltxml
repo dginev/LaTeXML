@@ -4723,8 +4723,7 @@ DefPrimitive('\addvspace {}', sub {
     my $skip = $length->ptValue;
     return if !$skip || $skip <= 0;
     Digest(Tokens(T_CS('\vskip'), $length->revert, T_CS('\relax')));
-    return; },
-  properties => sub { (isSpace => 1); });
+    return; });
 DefPrimitive('\addpenalty {}', undef);
 DefPrimitiveI('\@endparenv');
 

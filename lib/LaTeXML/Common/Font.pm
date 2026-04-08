@@ -679,11 +679,14 @@ sub computeBoxesSize {
           $$_[3] = $bs for @plines; }
         # CJK text: browsers render CJK with ~10% larger line-height than TeX baseline,
         # due to taller CJK glyphs in the browser's font vs TeX's CMR metrics.
+        # Only adjust lines that actually contain CJK characters ($$line[5]),
+        # leaving Latin-only lines at the normal baseline.
         if ($LaTeXML::Common::Font::CJK_CONTENT) {
           my $base_bs = ($bs ? $bs / 65536 : ($self->getSize || DEFSIZE() || 10) * 1.2);
           my $cjk_bs  = fixpoint($base_bs * 1.1);
           for my $line (@plines) {
-            $$line[3] = $cjk_bs if !$$line[3] || $$line[3] < $cjk_bs; } }
+            if ($$line[5]) {
+              $$line[3] = $cjk_bs if !$$line[3] || $$line[3] < $cjk_bs; } } }
         push(@lines, @plines); }
       else {
         my ($w, $h, $d) = $self->computeBoxesSize_box($box);
@@ -784,8 +787,8 @@ sub computeBoxesSize_words {
         if ($wd || $ht || $dp) {
           push(@words, [$prevspace, $wd, $ht, $dp]);
           $prevspace = 0; }
-        # Each CJK char is its own breakable "word"
-        push(@words, [$prevspace, $w, $h, $d]);
+        # Each CJK char is its own breakable "word", tagged with CJK flag
+        push(@words, [$prevspace, $w, $h, $d, 1]);
         $wd      = $ht = $dp = 0; $prevspace = 0;
         $prevbox = $box;          next; }
       $wd += $w;
@@ -843,23 +846,27 @@ sub _flatten_inline_boxes {
   return @result; }
 
 # do line breaking of words into lines, according to $wrapwidth (if), or explicit breaks.
+# Words may carry a CJK flag ($$item[4]) from computeBoxesSize_words; lines that contain
+# CJK words get $$line[5]=1 so the CJK baseline adjustment can be applied per-line.
 sub computeBoxesSize_lines {
   my ($self, $wrapwidth, @words) = @_;
   my @lines = ();
   my ($wd, $ht, $dp) = (0, 0, 0);
+  my $has_cjk = 0;
   foreach my $item (@words) {
     my ($space, $w, $h, $d) = @$item;
     if ($space == -1) {
-      push(@lines, [$wd, $ht, $dp]) if $wd;
-      $wd = $w; $ht = $h; $dp = $d; }
+      push(@lines, [$wd, $ht, $dp, undef, undef, $has_cjk]) if $wd;
+      $wd = $w; $ht = $h; $dp = $d; $has_cjk = $$item[4] || 0; }
     elsif ((defined $wrapwidth) && ($wd + $space + $w > $wrapwidth)) {
-      push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd;
-      $wd = $w; $ht = $h; $dp = $d; }
+      push(@lines, [$wrapwidth || $wd, $ht, $dp, undef, undef, $has_cjk]) if $wd;
+      $wd = $w; $ht = $h; $dp = $d; $has_cjk = $$item[4] || 0; }
     else {
+      $has_cjk ||= $$item[4] || 0;
       $wd += $space + $w;
       $ht = max($ht, $h);
       $dp = max($dp, $d); } }
-  push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd || $ht || $dp;
+  push(@lines, [$wrapwidth || $wd, $ht, $dp, undef, undef, $has_cjk]) if $wd || $ht || $dp;
   return @lines; }
 
 # Sum up a stack of lines, determining w as max, and h & d according to $vattach.

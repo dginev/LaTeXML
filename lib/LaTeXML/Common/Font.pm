@@ -690,16 +690,22 @@ sub computeBoxesSize {
         if ($w || $h || $d) {
           # In TeX, display math has \abovedisplayskip and \belowdisplayskip glue
           my $boxmode = (ref $box && $box->can('getProperty')) ? ($box->getProperty('mode') || '') : '';
+          # Detect vertical glue (vskip, addvspace, etc.) — these are explicit spacing
+          # that suppresses baselineskip adjustment in TeX's vertical list.
+          my $is_vglue = (ref $box && $box->can('getProperty')
+              && $box->getProperty('isVerticalSpace')) ? 1 : 0;
           if ($boxmode eq 'display_math') {
             my $above = $STATE->lookupDefinition(T_CS('\abovedisplayskip'));
             my $below = $STATE->lookupDefinition(T_CS('\belowdisplayskip'));
             $above = $above->valueOf->valueOf if $above;
             $below = $below->valueOf->valueOf if $below;
+            # Display skips replace baselineskip between text and display,
+            # so they participate in normal interline spacing (not marked as vglue).
             push(@lines, [0, $above || 0, 0]) if $above;
             push(@lines, [$w, $h, $d]);
             push(@lines, [0, $below || 0, 0]) if $below; }
           else {
-            push(@lines, [$w, $h, $d]); } } } } }
+            push(@lines, [$w, $h, $d, undef, $is_vglue]); } } } } }
   else {
     # Scan all boxes, collecting into "words", then (possibly) break into lines.
     my @words = $self->computeBoxesSize_words(@boxes);
@@ -882,8 +888,15 @@ sub computeBoxesSize_stack {
     while (@l) {
       my $r = shift(@l);
       if (@l) {
-        my $bs = $$r[3] || $baseline;    # per-line baselineskip or global fallback
-        if ($$r[2] + $l[0][1] < $bs) {
+        # In TeX, \baselineskip glue is only inserted between two consecutive lines
+        # (hboxes).  Explicit vertical glue (\vskip, display skip, etc.) suppresses
+        # the baselineskip adjustment — the glue amount is the total spacing.
+        next if $$r[4];                 # current item is vertical glue: don't adjust its depth
+        next if $l[0][4];               # next item is vertical glue: don't adjust for it
+        my $bs = $$r[3] || $baseline;   # per-line baselineskip or global fallback
+                                        # TeX inserts \baselineskip glue when depth + height does NOT exceed
+                                        # \baselineskip (i.e. <=), otherwise uses \lineskip.
+        if ($$r[2] + $l[0][1] <= $bs) {
           $$r[2] = $bs - $l[0][1]; }
         else {
           $$r[2] += $lineskip; } } }

@@ -18,12 +18,12 @@
             <svg:path d="M 1.97 5.91 L 1.97 310.7 L 475.41 310.7 L 475.41 5.91 C 475.41 3.73 473.65 1.97 471.47 1.97 L 5.91 1.97 C 3.73 1.97 1.97 3.73 1.97 5.91 Z" style="stroke:none"/>
           </svg:g>
           <svg:g fill-opacity="1.0" transform="matrix(1.0 0.0 0.0 1.0 21.65 319.3)">
-            <svg:foreignObject color="#FFFFFF" height="12.3" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:9.61px;--ltx-fo-depth:2.69px;" transform="matrix(1 0 0 -1 0 9.61)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
+            <svg:foreignObject color="#FFFFFF" height="12.3" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:9.61px;--ltx-fo-depth:2.69px;--ltx-fo-line-height:1.44;" transform="matrix(1 0 0 -1 0 9.61)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
                 <p>An Example for Tool Calling with GPT-4</p>
               </inline-block></svg:foreignObject>
           </svg:g>
           <svg:g fill-opacity="1.0" transform="matrix(1.0 0.0 0.0 1.0 21.65 16.27)">
-            <svg:foreignObject color="#000000" height="285.11" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:282.62px;--ltx-fo-depth:2.49px;" transform="matrix(1 0 0 -1 0 282.62)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
+            <svg:foreignObject color="#000000" height="285.11" overflow="visible" style="font-size:13.84px;--ltx-fo-width:31.37em;--ltx-fo-height:282.62px;--ltx-fo-depth:2.49px;--ltx-fo-line-height:1.44;" transform="matrix(1 0 0 -1 0 282.62)" width="434.07"><inline-block class="ltx_minipage" vattach="bottom" width="31.37em">
                 <p><text font="bold" fontsize="90%">Instruction Prompt:<text font="medium"> You are currently in the tool calling stage. You are given selected tools that can be potentially used to solve the sub-question. Your goal is to extract the required parameters needed to call the tool from the sub-question based on the tool descriptions. Output in the following format: {parameter name: parameter, <Math mode="inline" tex="\cdots" text="cdots" xml:id="p1.pic1.m1">
                         <XMath>
                           <XMTok name="cdots" role="ID">⋯</XMTok>

@@ -429,11 +429,20 @@ Tag('svg:foreignObject', autoOpen => 1, autoClose => 1,
       # Set CSS custom properties. Use content element's em width (from insertBlock)
       # for --ltx-fo-width so it matches the minipage/parbox CSS width exactly.
       my $fo_width = $content_width_em || ($w->emValue(undef, $f) . 'em');
+      # Compute effective line-height ratio for the content.  Use the content
+      # font's baseline (from baseline_map) and apply any \setstretch factor.
+      # We can't read \baselineskip from $STATE here because the afterClose
+      # hook runs in the outer scope, not the content's scope.
+      my $content_bs = LaTeXML::Common::Font::baseline_for_fontsize($fontsize_pt);
+      my $stretch    = $STATE->lookupValue('SETSTRETCH_FACTOR');
+      $content_bs *= $stretch if $stretch && $stretch > 0 && $stretch != 1;
+      my $line_height = sprintf("%.2f", $content_bs / $fontsize_pt);
       $document->setAttribute($node,
         style => 'font-size:' . $fontsize_px . 'px;'
           . '--ltx-fo-width:' . $fo_width . ';'
           . '--ltx-fo-height:' . $h->pxValue . 'px;'
-          . '--ltx-fo-depth:' . $d->pxValue . 'px;');
+          . '--ltx-fo-depth:' . $d->pxValue . 'px;'
+          . ($line_height ne '1.20' ? '--ltx-fo-line-height:' . $line_height . ';' : ''));
     } });
 
 sub isVAttached {

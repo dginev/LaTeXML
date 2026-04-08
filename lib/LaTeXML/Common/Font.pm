@@ -699,11 +699,13 @@ sub computeBoxesSize {
             my $below = $STATE->lookupDefinition(T_CS('\belowdisplayskip'));
             $above = $above->valueOf->valueOf if $above;
             $below = $below->valueOf->valueOf if $below;
-            # Display skips replace baselineskip between text and display,
-            # so they participate in normal interline spacing (not marked as vglue).
-            push(@lines, [0, $above || 0, 0]) if $above;
+            # Display skips are explicit vertical glue that replaces baselineskip.
+            # Mark them as vglue so their depth isn't baselineskip-adjusted, and
+            # adjacent text lines keep their natural depth (no interline adjustment
+            # to the skip — the skip IS the spacing).
+            push(@lines, [0, $above || 0, 0, undef, 1]) if $above;
             push(@lines, [$w, $h, $d]);
-            push(@lines, [0, $below || 0, 0]) if $below; }
+            push(@lines, [0, $below || 0, 0, undef, 1]) if $below; }
           else {
             push(@lines, [$w, $h, $d, undef, $is_vglue]); } } } } }
   else {
@@ -889,10 +891,9 @@ sub computeBoxesSize_stack {
       my $r = shift(@l);
       if (@l) {
         # In TeX, \baselineskip glue is only inserted between two consecutive lines
-        # (hboxes).  Explicit vertical glue (\vskip, display skip, etc.) suppresses
-        # the baselineskip adjustment — the glue amount is the total spacing.
+        # (hboxes).  Explicit vertical glue (\vskip, display skip, etc.) keeps its
+        # natural depth (0) — only text/box lines get baselineskip adjustment.
         next if $$r[4];                 # current item is vertical glue: don't adjust its depth
-        next if $l[0][4];               # next item is vertical glue: don't adjust for it
         my $bs = $$r[3] || $baseline;   # per-line baselineskip or global fallback
                                         # TeX inserts \baselineskip glue when depth + height does NOT exceed
                                         # \baselineskip (i.e. <=), otherwise uses \lineskip.

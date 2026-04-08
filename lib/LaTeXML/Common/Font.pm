@@ -850,7 +850,7 @@ sub computeBoxesSize_lines {
     if ($space == -1) {
       push(@lines, [$wd, $ht, $dp]) if $wd;
       $wd = $w; $ht = $h; $dp = $d; }
-    elsif ((defined $wrapwidth) && ($wd + $space * 0.5 + $w > $wrapwidth)) {
+    elsif ((defined $wrapwidth) && ($wd + $space + $w > $wrapwidth)) {
       push(@lines, [$wrapwidth || $wd, $ht, $dp]) if $wd;
       $wd = $w; $ht = $h; $dp = $d; }
     else {

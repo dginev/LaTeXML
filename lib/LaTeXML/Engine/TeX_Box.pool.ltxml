@@ -338,15 +338,16 @@ DefConstructor('\hbox BoxSpecification HBoxContents', sub {
     my $spec = $whatsit->getArg(1);
     my $box  = $whatsit->getArg(2);
     if (my $w = GetKeyVal($spec, 'to')) {
-      # Clamp to available width if wider: prevents overfull hbox overflow in HTML,
-      # where content wraps within its container rather than overflowing.
-      # Subtract 2*\tabcolsep to leave room for cell padding in tabulars
-      # (small constant, harmless outside tabulars).
+      # Clamp to available width when only slightly wider than \hsize (within
+      # 2*\tabcolsep), accounting for cell padding in tabulars.  Don't clamp
+      # when the box is intentionally much wider (e.g. wide multicolumn cells).
       my $hsize = LookupRegister('\hsize');
-      if ($hsize && $w->valueOf > $hsize->valueOf && $hsize->valueOf > 0) {
+      if ($hsize && $hsize->valueOf > 0 && $w->valueOf > $hsize->valueOf) {
         my $tabcolsep = LookupRegister('\tabcolsep');
-        my $avail     = $hsize->subtract($tabcolsep->multiply(2));
-        $w = ($avail->valueOf > 0) ? $avail : $hsize; }
+        my $margin    = $tabcolsep->multiply(2)->valueOf;
+        if ($w->valueOf - $hsize->valueOf <= $margin) {
+          my $avail = $hsize->subtract($tabcolsep->multiply(2));
+          $w = ($avail->valueOf > 0) ? $avail : $hsize; } }
       $whatsit->setWidth($w); }
     elsif (my $s = GetKeyVal($spec, 'spread')) {
       $whatsit->setWidth($box->getWidth->add($s)); }

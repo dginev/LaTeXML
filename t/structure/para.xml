@@ -87,14 +87,12 @@
           </para>
         </item>
       </itemize>
-    </para>
-    <para xml:id="S2.p2">
       <p>continuing paragraph.</p>
     </para>
-    <para xml:id="S2.p3">
+    <para xml:id="S2.p2">
       <p>Single line paragraph.</p>
     </para>
-    <para xml:id="S2.p4">
+    <para xml:id="S2.p3">
       <itemize xml:id="S2.I2">
         <item xml:id="S2.I2.i1">
           <tags>
@@ -116,10 +114,10 @@
         </item>
       </itemize>
     </para>
-    <para xml:id="S2.p5">
+    <para xml:id="S2.p4">
       <p>Another single line paragraph.</p>
     </para>
-    <para xml:id="S2.p6">
+    <para xml:id="S2.p5">
       <p>Multiple Para within item</p>
       <itemize xml:id="S2.I3">
         <item xml:id="S2.I3.i1">

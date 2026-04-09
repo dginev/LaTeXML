@@ -663,16 +663,41 @@ sub computeBoxesSize {
   # ----------------------------------------------------------------------
   my @lines = ();
   if ($layout eq 'vertical') {                               # For vertical, ALL boxes are lines
-    foreach my $box (@boxes) {
+    my @grouped = ();
+    my @hrun    = ();
+    for my $box (@boxes) {
+      my $bmode = (ref $box && $box->can('getProperty')) ? ($box->getProperty('mode') || '') : '';
+      if ($bmode eq 'horizontal' && ref $box eq 'LaTeXML::Core::Box') {
+        push(@hrun, $box); }
+      else {
+        if (@hrun >= 10) {
+          my $l = LaTeXML::Core::List->new(@hrun);
+          $l->setProperty(mode                => 'horizontal');
+          $l->setProperty('_pseudo_paragraph' => 1);
+          push(@grouped, $l); }
+        elsif (@hrun) {
+          push(@grouped, @hrun); }
+        @hrun = ();
+        push(@grouped, $box); } }
+    if (@hrun >= 10) {
+      my $l = LaTeXML::Core::List->new(@hrun);
+      $l->setProperty(mode                => 'horizontal');
+      $l->setProperty('_pseudo_paragraph' => 1);
+      push(@grouped, $l); }
+    elsif (@hrun) {
+      push(@grouped, @hrun); }
+    foreach my $box (@grouped) {
       # In TeX, a horizontal (paragraph) list would have already been typeset into
       # an internal_vertical list; inside a vertical list it should be subject to vattach
       if ((ref $box eq 'LaTeXML::Core::List')
         && (($box->getProperty('mode') || '') eq 'horizontal')) {
-        my $width = $box->getProperty('width') || $wrapwidth;
+        my $is_pseudo = $box->getProperty('_pseudo_paragraph');
+        my $width     = $is_pseudo ? undef : ($box->getProperty('width') || $wrapwidth);
         $width = $width->valueOf if ref $width;
         # Carry the per-paragraph \baselineskip captured during repackHorizontal
         my $bs = $box->getProperty('baselineskip');
-        local $LaTeXML::Common::Font::CJK_CONTENT = 0;
+        local $LaTeXML::Common::Font::CJK_CONTENT    = 0;
+        local $LaTeXML::Common::Font::FLATTEN_INLINE = $is_pseudo ? 0 : 1;
         my @plines = $self->computeBoxesSize_lines($width,
           $self->computeBoxesSize_words($box->unlist));
         if ($bs) {    # annotate lines with their source paragraph's baselineskip
@@ -713,6 +738,7 @@ sub computeBoxesSize {
             push(@lines, [$w, $h, $d, undef, $is_vglue]); } } } } }
   else {
     # Scan all boxes, collecting into "words", then (possibly) break into lines.
+    local $LaTeXML::Common::Font::FLATTEN_INLINE = 1;
     my @words = $self->computeBoxesSize_words(@boxes);
     @lines = $self->computeBoxesSize_lines($wrapwidth, @words); }
   # ----------------------------------------------------------------------
@@ -756,7 +782,7 @@ sub computeBoxesSize_words {
   # content participates in word-level breaking. Without this, an entire
   # \emph{long text with spaces} is treated as one indivisible "word",
   # preventing accurate line-wrapping estimation and underestimating height.
-  @boxes = _flatten_inline_boxes(@boxes);
+  @boxes = _flatten_inline_boxes(@boxes) if $LaTeXML::Common::Font::FLATTEN_INLINE;
   my @words = ();
   my $prevbox;
   my $prevspace = 0;
@@ -824,7 +850,10 @@ sub _flatten_inline_boxes {
       if ($mode eq 'restricted_horizontal'
         && !$box->getProperty('content_box')
         && !$box->getProperty('isBreak')
-        && !$box->getProperty('isSpace')) {
+        && !$box->getProperty('isSpace')
+        && !(ref $box eq 'LaTeXML::Core::Whatsit'
+          && $box->getDefinition
+          && ref($box->getDefinition->getSizer || '') eq 'CODE')) {
         # For Whatsits: extract content from body property or arguments
         my @children;
         if (ref $box eq 'LaTeXML::Core::Whatsit') {

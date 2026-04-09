@@ -21,7 +21,7 @@
       <tag role="refnum">1</tag>
       <tag role="typerefnum">Table 1</tag>
     </tags>
-    <inline-block class="ltx_figure_panel" depth="9.3pt" height="12.9pt" width="124.2pt" xscale="0.881907917618233" xtranslate="-8.3pt" yscale="0.881907917618233" ytranslate="1.5pt">
+    <inline-block class="ltx_figure_panel" depth="7.1pt" height="10.7pt" width="124.2pt" xscale="0.881907917618233" xtranslate="-8.3pt" yscale="0.881907917618233" ytranslate="1.2pt">
       <tabular class="ltx_minipage" vattach="middle" width="138.0pt">
         <tbody>
           <tr>
@@ -35,7 +35,7 @@
         </tbody>
       </tabular>
     </inline-block>
-    <inline-block class="ltx_figure_panel" depth="9.3pt" height="12.9pt" width="124.2pt" xscale="0.881907917618233" xtranslate="-8.3pt" yscale="0.881907917618233" ytranslate="1.5pt">
+    <inline-block class="ltx_figure_panel" depth="7.1pt" height="10.7pt" width="124.2pt" xscale="0.881907917618233" xtranslate="-8.3pt" yscale="0.881907917618233" ytranslate="1.2pt">
       <tabular class="ltx_minipage" vattach="middle" width="138.0pt">
         <tbody>
           <tr>
@@ -107,7 +107,7 @@
       <tag role="typerefnum">Algorithm 1</tag>
     </tags>
     <toccaption><tag close=" ">1</tag>A Wrapped Algorithm</toccaption>
-    <caption><tag close=" "><text font="bold">Algorithm 1</text></tag> A Wrapped Algorithm</caption>
+    <caption><tag close=" "><text font="bold">Algorithm 1</text></tag>A Wrapped Algorithm</caption>
     <p>1- mock algorithm with just enough textual content.<break/>2- mock algorithm with just enough textual content.<break/>3- mock algorithm with just enough textual content.</p>
   </figure>
   <paragraph inlist="toc" xml:id="S0.SS0.SSS0.Px1">
@@ -461,7 +461,7 @@
           <tag role="typerefnum">Algorithm 2</tag>
         </tags>
         <toccaption><tag close=" ">2</tag>Algorithms in minipage</toccaption>
-        <caption><tag close=" "><text font="bold">Algorithm 2</text></tag> Algorithms in minipage</caption>
+        <caption><tag close=" "><text font="bold">Algorithm 2</text></tag>Algorithms in minipage</caption>
         <listing>
           <listingline xml:id="alg2.l0"><tags>
               <tag><text fontsize="80%">0:</text></tag>
@@ -671,7 +671,6 @@
 </listingline>
         </listing>
       </float>
-      <break class="ltx_break"/>
       <figure class="ltx_figure_panel ltx_minipage" vattach="middle" width="144.9pt" xml:id="S0.SS0.SSS0.Px1.fig2">
         <float class="ltx_figure_panel ltx_float_algorithm" framed="top" inlist="loa" labels="LABEL:alg:rpc" placement="H" xml:id="alg3">
           <tags>
@@ -680,7 +679,7 @@
             <tag role="typerefnum">Algorithm 3</tag>
           </tags>
           <toccaption><tag close=" ">3</tag><text color="#0000FF">line</text></toccaption>
-          <caption><tag close=" "><text font="bold">Algorithm 3</text></tag> <text color="#0000FF">line</text></caption>
+          <caption><tag close=" "><text font="bold">Algorithm 3</text></tag><text color="#0000FF">line</text></caption>
           <listing>
             <listingline xml:id="alg3.l0"><tags>
                 <tag><text fontsize="80%">0:</text></tag>
@@ -762,7 +761,6 @@
               </tags> <text font="bold">end</text> <text font="bold">while</text></listingline>
           </listing>
         </float>
-        <break class="ltx_break"/>
         <float class="ltx_figure_panel ltx_float_algorithm" framed="top" inlist="loa" labels="LABEL:alg:replace" placement="H" xml:id="alg4">
           <tags>
             <tag><text font="bold">Algorithm 4</text></tag>
@@ -770,7 +768,7 @@
             <tag role="typerefnum">Algorithm 4</tag>
           </tags>
           <toccaption><tag close=" ">4</tag><text color="#0000FF">line</text></toccaption>
-          <caption><tag close=" "><text font="bold">Algorithm 4</text></tag> <text color="#0000FF">line</text></caption>
+          <caption><tag close=" "><text font="bold">Algorithm 4</text></tag><text color="#0000FF">line</text></caption>
           <listing>
             <listingline xml:id="alg4.l0"><tags>
                 <tag><text fontsize="80%">0:</text></tag>

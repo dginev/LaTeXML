@@ -853,7 +853,9 @@ sub _flatten_inline_boxes {
         && !$box->getProperty('isSpace')
         && !(ref $box eq 'LaTeXML::Core::Whatsit'
           && $box->getDefinition
-          && ref($box->getDefinition->getSizer || '') eq 'CODE')) {
+          && (ref($box->getDefinition->getSizer || '') eq 'CODE'
+            || defined $box->getProperty('width')
+            || defined $box->getProperty('height')))) {
         # For Whatsits: extract content from body property or arguments
         my @children;
         if (ref $box eq 'LaTeXML::Core::Whatsit') {

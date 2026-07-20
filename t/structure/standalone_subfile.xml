@@ -11,4 +11,7 @@
   <para xml:id="p2">
     <p>Child text.</p>
   </para>
+  <para class="ltx_minipage" vattach="middle" width="142.3pt" xml:id="p3">
+    <p>Valued child text.</p>
+  </para>
 </document>

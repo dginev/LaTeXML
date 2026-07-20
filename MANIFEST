@@ -1789,6 +1789,7 @@ t/structure/mainfile.pdf
 t/structure/mainfile.tex
 t/structure/asubfile.tex
 t/structure/astandalonefile.tex
+t/structure/avaluedstandalonefile.tex
 t/structure/mainfile.xml
 t/structure/myclass.cls
 t/structure/myclass.cls.ltxml

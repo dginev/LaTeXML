@@ -28,7 +28,7 @@ DefPrimitiveI(T_CS('\@standalone@start@input'), undef, sub {
 our %standalone_option_packages =
   map { ($_ => 1) } qw(tikz pstricks preview varwidth multido);
 
-DefPrimitive('\@standalone@documentclass[]{}', sub {
+DefPrimitive('\@standalone@documentclass OptionalKeyVals {}', sub {
     my ($stomach, $options, $class) = @_;
     $stomach->bgroup;
     AssignValue(inPreamble => 1);
@@ -40,8 +40,16 @@ DefPrimitive('\@standalone@documentclass[]{}', sub {
     # 12pt.sty. Within a standalone subfile we still require the options that
     # load a package, which is what makes \documentclass[tikz]{standalone}
     # (the original use case, #1432) work.
-    if (ToString($class) =~ /^\s*standalone\s*$/) {
-      for my $option (split(",", ToString($options))) {
+    #
+    # Read as OptionalKeyVals and matched on the KEY, because a class option
+    # list is a keyval list: every one of these options also has a valued form
+    # (standalone.sty's \sa@boolorvalue takes varwidth=5cm and tikz=true just
+    # as it takes the bare words), and a value may be a brace group containing
+    # commas (border={1pt 2pt}). Splitting on "," and matching whole items
+    # dropped the package for all of those.
+    if (ToString($class) =~ /^\s*standalone\s*$/ && $options) {
+      my %given = $options->getPairs;    # flat key => value list
+      for my $option (keys %given) {
         $option =~ s/^\s+|\s+$//g;
         RequirePackage($option) if $standalone_option_packages{$option};
       }
